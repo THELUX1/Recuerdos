@@ -3,7 +3,7 @@
    recuerdos.js
    Supabase + Google Drive
 ========================================= */
-
+alert("recuerdos.js cargó correctamente");
 let recuerdos = [];
 let googleDrivePreparado = false;
 
@@ -84,41 +84,51 @@ function alternarMenu() {
         document.querySelector(".sidebar");
 
     const overlay =
-        document.getElementById(
-            "menuOverlay"
-        );
+        document.getElementById("menuOverlay");
 
     const boton =
-        document.getElementById(
-            "menuToggle"
-        );
-
+        document.getElementById("menuToggle");
 
     if (!sidebar) {
+        console.error("No se encontró .sidebar");
         return;
     }
 
+    const abierto =
+        sidebar.classList.contains("open") ||
+        sidebar.classList.contains("active");
 
-    sidebar.classList.toggle("open");
+    if (abierto) {
 
+        sidebar.classList.remove("open");
+        sidebar.classList.remove("active");
 
-    if (overlay) {
+        if (overlay) {
+            overlay.classList.remove("open");
+            overlay.classList.remove("active");
+        }
 
-        overlay.classList.toggle("open");
-    }
-
-
-    if (boton) {
-
-        const abierto =
-            sidebar.classList.contains(
-                "open"
+        if (boton) {
+            boton.setAttribute(
+                "aria-expanded",
+                "false"
             );
+        }
 
-        boton.setAttribute(
-            "aria-expanded",
-            abierto
-        );
+    } else {
+
+        sidebar.classList.add("open");
+
+        if (overlay) {
+            overlay.classList.add("open");
+        }
+
+        if (boton) {
+            boton.setAttribute(
+                "aria-expanded",
+                "true"
+            );
+        }
     }
 }
 
@@ -129,34 +139,23 @@ function cerrarMenu() {
         document.querySelector(".sidebar");
 
     const overlay =
-        document.getElementById(
-            "menuOverlay"
-        );
+        document.getElementById("menuOverlay");
 
     const boton =
-        document.getElementById(
-            "menuToggle"
-        );
+        document.getElementById("menuToggle");
 
 
     if (sidebar) {
-
-        sidebar.classList.remove(
-            "open"
-        );
+        sidebar.classList.remove("open");
+        sidebar.classList.remove("active");
     }
-
 
     if (overlay) {
-
-        overlay.classList.remove(
-            "open"
-        );
+        overlay.classList.remove("open");
+        overlay.classList.remove("active");
     }
 
-
     if (boton) {
-
         boton.setAttribute(
             "aria-expanded",
             "false"
