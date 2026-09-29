@@ -8,6 +8,7 @@
     <title>Nuestros recuerdos ❤️</title>
 
     <style>
+
         * {
             box-sizing: border-box;
         }
@@ -15,213 +16,446 @@
         body {
             margin: 0;
             min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
             font-family: Arial, sans-serif;
             background: #111;
             color: white;
         }
 
-        .login {
-            width: min(90%, 380px);
-            padding: 35px;
-            border-radius: 20px;
-            background: #1c1c1c;
+        header {
+            padding: 35px 20px 25px;
             text-align: center;
         }
 
         h1 {
-            margin-bottom: 8px;
+            margin: 0 0 8px;
+            font-size: 30px;
         }
 
-        p {
-            color: #aaa;
-            margin-bottom: 25px;
+        #usuario {
+            color: #999;
+            font-size: 14px;
         }
 
-        input {
-            width: 100%;
-            padding: 14px;
-            margin-bottom: 12px;
-            border: 0;
-            border-radius: 10px;
-            background: #292929;
-            color: white;
-            font-size: 16px;
-            outline: none;
+        .acciones {
+            width: min(1100px, 92%);
+            margin: 0 auto 25px;
+            display: flex;
+            justify-content: center;
         }
 
-        input:focus {
-            outline: 1px solid #666;
-        }
-
-        button {
-            width: 100%;
-            padding: 14px;
-            border: 0;
-            border-radius: 10px;
+        .btn-agregar {
+            padding: 13px 22px;
+            border: none;
+            border-radius: 12px;
             background: white;
             color: #111;
-            font-size: 16px;
+            font-size: 15px;
+            font-weight: bold;
             cursor: pointer;
         }
 
-        button:disabled {
-            opacity: 0.6;
-            cursor: wait;
+        .btn-agregar:hover {
+            opacity: 0.9;
         }
 
-        #mensaje {
-            margin-top: 15px;
-            min-height: 20px;
-            color: #ff8b8b;
+        .btn-salir {
+            margin-top: 18px;
+            padding: 9px 16px;
+            border: none;
+            border-radius: 9px;
+            background: #292929;
+            color: white;
+            cursor: pointer;
         }
+
+        #estado {
+            text-align: center;
+            margin: 45px 20px;
+            color: #888;
+        }
+
+        #album {
+            width: min(1100px, 92%);
+            margin: auto;
+            display: grid;
+            grid-template-columns: repeat(
+                auto-fill,
+                minmax(220px, 1fr)
+            );
+            gap: 15px;
+            padding-bottom: 50px;
+        }
+
+        .recuerdo {
+            background: #1c1c1c;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        .recuerdo img {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+            display: block;
+        }
+
+        .info {
+            padding: 13px;
+        }
+
+        .info h3 {
+            margin: 0 0 5px;
+        }
+
+        .info p {
+            margin: 0;
+            color: #999;
+            font-size: 14px;
+        }
+
+        /* =========================
+           MODAL
+        ========================= */
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+
+            display: none;
+            justify-content: center;
+            align-items: center;
+
+            padding: 20px;
+            z-index: 100;
+        }
+
+        .modal.activo {
+            display: flex;
+        }
+
+        .modal-contenido {
+            width: min(100%, 430px);
+            background: #1c1c1c;
+            border-radius: 20px;
+            padding: 25px;
+        }
+
+        .modal-contenido h2 {
+            margin-top: 0;
+            text-align: center;
+        }
+
+        .campo {
+            margin-bottom: 15px;
+        }
+
+        .campo label {
+            display: block;
+            margin-bottom: 7px;
+            color: #ccc;
+            font-size: 14px;
+        }
+
+        .campo input,
+        .campo textarea {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            background: #292929;
+            color: white;
+            font-size: 15px;
+            font-family: inherit;
+        }
+
+        .campo textarea {
+            resize: vertical;
+            min-height: 90px;
+        }
+
+        .botones-modal {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .botones-modal button {
+            flex: 1;
+            padding: 13px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+
+        .btn-cancelar {
+            background: #292929;
+            color: white;
+        }
+
+        .btn-guardar {
+            background: white;
+            color: #111;
+            font-weight: bold;
+        }
+
+        #foto {
+            background: transparent;
+            padding: 0;
+        }
+
     </style>
+
 </head>
 
 <body>
 
-    <div class="login">
+    <header>
 
         <h1>Nuestros recuerdos ❤️</h1>
 
-        <p>
-            Un pequeño lugar para guardar momentos especiales.
-        </p>
+        <div id="usuario"></div>
 
-        <input
-            type="email"
-            id="email"
-            placeholder="Correo electrónico"
-            autocomplete="email"
-        >
-
-        <input
-            type="password"
-            id="password"
-            placeholder="Contraseña"
-            autocomplete="current-password"
-        >
-
-        <button id="loginBtn" onclick="iniciarSesion()">
-            Entrar
+        <button
+            class="btn-salir"
+            onclick="cerrarSesion()">
+            Cerrar sesión
         </button>
 
-        <div id="mensaje"></div>
+    </header>
+
+
+    <div class="acciones">
+
+        <button
+            class="btn-agregar"
+            onclick="abrirModal()">
+
+            ＋ Agregar recuerdo
+
+        </button>
 
     </div>
 
 
-    <!-- Biblioteca de Supabase -->
+    <div id="estado">
+        Todavía no hay recuerdos... 📷
+    </div>
+
+
+    <div id="album"></div>
+
+
+    <!-- =========================
+         MODAL AGREGAR RECUERDO
+    ========================== -->
+
+    <div
+        id="modal"
+        class="modal">
+
+        <div class="modal-contenido">
+
+            <h2>Nuevo recuerdo 📸</h2>
+
+
+            <div class="campo">
+
+                <label for="foto">
+                    Foto
+                </label>
+
+                <input
+                    type="file"
+                    id="foto"
+                    accept="image/*">
+
+            </div>
+
+
+            <div class="campo">
+
+                <label for="titulo">
+                    Título
+                </label>
+
+                <input
+                    type="text"
+                    id="titulo"
+                    placeholder="Por ejemplo: Nuestro primer paseo">
+
+            </div>
+
+
+            <div class="campo">
+
+                <label for="descripcion">
+                    Descripción
+                </label>
+
+                <textarea
+                    id="descripcion"
+                    placeholder="Escribí algo sobre este recuerdo..."></textarea>
+
+            </div>
+
+
+            <div class="campo">
+
+                <label for="fecha">
+                    Fecha
+                </label>
+
+                <input
+                    type="date"
+                    id="fecha">
+
+            </div>
+
+
+            <div class="botones-modal">
+
+                <button
+                    class="btn-cancelar"
+                    onclick="cerrarModal()">
+
+                    Cancelar
+
+                </button>
+
+                <button
+                    class="btn-guardar"
+                    onclick="guardarRecuerdo()">
+
+                    Guardar recuerdo
+
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- Supabase -->
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <!-- Nuestra configuración -->
     <script src="js/supabase.js"></script>
 
 
     <script>
 
-        async function iniciarSesion() {
+        async function comprobarSesion() {
 
-            const email =
-                document.getElementById("email").value.trim();
-
-            const password =
-                document.getElementById("password").value;
-
-            const mensaje =
-                document.getElementById("mensaje");
-
-            const boton =
-                document.getElementById("loginBtn");
+            const { data, error } =
+                await supabaseClient.auth.getSession();
 
 
-            // Limpiar mensaje anterior
-            mensaje.textContent = "";
-            mensaje.style.color = "#ff8b8b";
+            if (!data.session) {
 
-
-            // Comprobar campos
-            if (!email || !password) {
-
-                mensaje.textContent =
-                    "Completá el correo y la contraseña.";
+                window.location.href =
+                    "index.html";
 
                 return;
+
             }
 
 
-            // Desactivar botón mientras inicia sesión
-            boton.disabled = true;
-            boton.textContent = "Ingresando...";
+            document.getElementById("usuario").textContent =
+                data.session.user.email;
 
 
-            try {
-
-                const { data, error } =
-                    await supabaseClient.auth.signInWithPassword({
-                        email: email,
-                        password: password
-                    });
-
-
-                if (error) {
-
-                    console.error("Error de Supabase:", error);
-
-                    mensaje.textContent =
-                        "Correo o contraseña incorrectos.";
-
-                    boton.disabled = false;
-                    boton.textContent = "Entrar";
-
-                    return;
-                }
-
-
-                // Login correcto
-                mensaje.style.color = "#8cffad";
-                mensaje.textContent = "¡Bienvenido! ❤️";
-
-
-                console.log("Usuario autenticado:", data.user);
-
-
-                // Esperamos un momento para mostrar el mensaje
-                setTimeout(() => {
-
-                    window.location.href = "recuerdos.html";
-
-                }, 500);
-
-
-            } catch (error) {
-
-                console.error("Error inesperado:", error);
-
-                mensaje.textContent =
-                    "Ocurrió un error. Intentá nuevamente.";
-
-                boton.disabled = false;
-                boton.textContent = "Entrar";
-            }
+            cargarRecuerdos();
 
         }
 
 
-        // Permitir presionar ENTER en los campos
-        document
-            .getElementById("password")
-            .addEventListener("keydown", function(event) {
+        async function cargarRecuerdos() {
 
-                if (event.key === "Enter") {
+            const estado =
+                document.getElementById("estado");
 
-                    iniciarSesion();
 
-                }
+            const { data, error } =
+                await supabaseClient
+                    .from("memories")
+                    .select("*")
+                    .order("date", {
+                        ascending: false
+                    });
 
-            });
+
+            if (error) {
+
+                console.error(error);
+
+                estado.textContent =
+                    "No pudimos cargar los recuerdos.";
+
+                return;
+
+            }
+
+
+            if (!data || data.length === 0) {
+
+                estado.style.display =
+                    "block";
+
+                estado.textContent =
+                    "Todavía no hay recuerdos... 📷";
+
+                return;
+
+            }
+
+
+            estado.style.display =
+                "none";
+
+        }
+
+
+        function abrirModal() {
+
+            document
+                .getElementById("modal")
+                .classList.add("activo");
+
+        }
+
+
+        function cerrarModal() {
+
+            document
+                .getElementById("modal")
+                .classList.remove("activo");
+
+        }
+
+
+        async function guardarRecuerdo() {
+
+            alert(
+                "La subida de fotos la conectaremos en el próximo paso 📸"
+            );
+
+        }
+
+
+        async function cerrarSesion() {
+
+            await supabaseClient.auth.signOut();
+
+            window.location.href =
+                "index.html";
+
+        }
+
+
+        comprobarSesion();
 
     </script>
 
