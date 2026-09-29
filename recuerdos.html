@@ -4,55 +4,32 @@
 
 <meta charset="UTF-8">
 
-<meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
->
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <title>Recuerdos</title>
-
 
 <style>
 
 :root {
-
     --background: #0e0e10;
     --surface: #17171a;
     --surface-light: #202024;
-
     --text: #f4f4f5;
     --muted: #929298;
-
     --border: rgba(255,255,255,.08);
-
 }
-
 
 * {
-
     box-sizing: border-box;
-
     margin: 0;
     padding: 0;
-
 }
 
-
 body {
-
     min-height: 100vh;
-
-    font-family:
-        Arial,
-        Helvetica,
-        sans-serif;
-
-    background:
-        var(--background);
-
-    color:
-        var(--text);
-
+    font-family: Arial, Helvetica, sans-serif;
+    background: var(--background);
+    color: var(--text);
 }
 
 
@@ -61,71 +38,49 @@ body {
 ========================= */
 
 .topbar {
-
     position: sticky;
-
     top: 0;
-
     z-index: 50;
 
     height: 64px;
 
     display: flex;
-
     align-items: center;
 
     padding: 0 20px;
 
-    background:
-        rgba(14,14,16,.92);
+    background: rgba(14,14,16,.92);
 
-    backdrop-filter:
-        blur(14px);
+    backdrop-filter: blur(14px);
 
-    border-bottom:
-        1px solid var(--border);
-
+    border-bottom: 1px solid var(--border);
 }
 
-
 .menu-button {
-
     width: 42px;
     height: 42px;
 
     border: none;
-
     border-radius: 12px;
 
-    background:
-        transparent;
+    background: transparent;
 
-    color:
-        var(--text);
+    color: var(--text);
 
     font-size: 25px;
 
     cursor: pointer;
-
 }
-
 
 .menu-button:hover {
-
-    background:
-        var(--surface-light);
-
+    background: var(--surface-light);
 }
 
-
 .topbar-title {
-
     margin-left: 12px;
 
     font-size: 18px;
-
     font-weight: 600;
-
 }
 
 
@@ -134,74 +89,53 @@ body {
 ========================= */
 
 main {
-
     width: 100%;
-
     max-width: 1100px;
 
     margin: auto;
 
-    padding:
-        35px 20px 60px;
-
+    padding: 35px 20px 60px;
 }
 
-
 .heading {
-
     display: flex;
-
-    justify-content:
-        space-between;
-
-    align-items:
-        center;
+    justify-content: space-between;
+    align-items: center;
 
     gap: 20px;
 
     margin-bottom: 30px;
-
 }
 
-
 .heading h1 {
-
     font-size: 32px;
 
     margin-bottom: 7px;
-
 }
-
 
 .heading p {
-
-    color:
-        var(--muted);
+    color: var(--muted);
 
     font-size: 15px;
-
 }
 
-
 .add-button {
-
     border: none;
-
     border-radius: 14px;
 
-    padding:
-        13px 18px;
+    padding: 13px 18px;
 
-    background:
-        white;
-
-    color:
-        #111;
+    background: white;
+    color: #111;
 
     font-weight: 600;
 
     cursor: pointer;
+}
 
+.add-button:disabled {
+    opacity: .5;
+    cursor: wait;
 }
 
 
@@ -210,54 +144,117 @@ main {
 ========================= */
 
 .empty {
-
     min-height: 330px;
 
     display: flex;
-
     flex-direction: column;
 
     justify-content: center;
-
     align-items: center;
 
     text-align: center;
 
-    border:
-        1px dashed rgba(255,255,255,.12);
+    border: 1px dashed rgba(255,255,255,.12);
 
     border-radius: 20px;
-
 }
 
-
 .empty-icon {
-
     font-size: 45px;
 
     margin-bottom: 15px;
-
 }
 
-
 .empty h2 {
-
     font-size: 21px;
 
     margin-bottom: 8px;
-
 }
 
-
 .empty p {
-
-    color:
-        var(--muted);
+    color: var(--muted);
 
     max-width: 350px;
 
     line-height: 1.5;
+}
 
+
+/* =========================
+   GALERÍA
+========================= */
+
+.grid {
+    display: grid;
+
+    grid-template-columns:
+        repeat(auto-fill, minmax(220px, 1fr));
+
+    gap: 18px;
+}
+
+.card {
+    overflow: hidden;
+
+    border: 1px solid var(--border);
+
+    border-radius: 18px;
+
+    background: var(--surface);
+
+    cursor: pointer;
+
+    transition:
+        transform .2s,
+        border-color .2s;
+}
+
+.card:hover {
+    transform: translateY(-3px);
+
+    border-color:
+        rgba(255,255,255,.16);
+}
+
+.card-image {
+    width: 100%;
+
+    aspect-ratio: 1 / 1;
+
+    display: block;
+
+    object-fit: cover;
+
+    background:
+        var(--surface-light);
+}
+
+.card-content {
+    padding: 15px;
+}
+
+.card-title {
+    font-size: 17px;
+
+    font-weight: 600;
+
+    margin-bottom: 6px;
+}
+
+.card-description {
+    color: var(--muted);
+
+    font-size: 14px;
+
+    line-height: 1.4;
+}
+
+.card-date {
+    margin-top: 10px;
+
+    color: var(--muted);
+
+    font-size: 12px;
 }
 
 
@@ -266,7 +263,6 @@ main {
 ========================= */
 
 .overlay {
-
     position: fixed;
 
     inset: 0;
@@ -282,21 +278,15 @@ main {
 
     transition:
         opacity .25s;
-
 }
 
-
 .overlay.active {
-
     opacity: 1;
 
     pointer-events: auto;
-
 }
 
-
 .sidebar {
-
     position: fixed;
 
     top: 0;
@@ -311,8 +301,7 @@ main {
 
     padding: 20px;
 
-    background:
-        #151518;
+    background: #151518;
 
     border-right:
         1px solid var(--border);
@@ -326,20 +315,14 @@ main {
     display: flex;
 
     flex-direction: column;
-
 }
-
 
 .sidebar.active {
-
     transform:
         translateX(0);
-
 }
 
-
 .sidebar-header {
-
     display: flex;
 
     align-items: center;
@@ -348,21 +331,15 @@ main {
         space-between;
 
     margin-bottom: 25px;
-
 }
 
-
 .sidebar-title {
-
     font-size: 20px;
 
     font-weight: 600;
-
 }
 
-
 .close-menu {
-
     width: 40px;
     height: 40px;
 
@@ -370,21 +347,16 @@ main {
 
     border-radius: 10px;
 
-    background:
-        transparent;
+    background: transparent;
 
-    color:
-        var(--text);
+    color: var(--text);
 
     font-size: 22px;
 
     cursor: pointer;
-
 }
 
-
 .menu-item {
-
     width: 100%;
 
     display: flex;
@@ -402,51 +374,36 @@ main {
 
     border-radius: 12px;
 
-    background:
-        transparent;
+    background: transparent;
 
-    color:
-        var(--text);
+    color: var(--text);
 
     text-align: left;
 
     font-size: 15px;
 
     cursor: pointer;
-
 }
-
 
 .menu-item:hover {
-
     background:
         var(--surface-light);
-
 }
-
 
 .menu-item.active {
-
     background:
         var(--surface-light);
-
 }
-
 
 .sidebar-bottom {
-
     margin-top: auto;
-
 }
 
-
 .user-email {
-
     padding:
         12px 14px;
 
-    color:
-        var(--muted);
+    color: var(--muted);
 
     font-size: 12px;
 
@@ -454,15 +411,11 @@ main {
 
     border-top:
         1px solid var(--border);
-
 }
 
-
 .logout {
-
     color:
         #ff8b8b;
-
 }
 
 
@@ -471,7 +424,6 @@ main {
 ========================= */
 
 .modal-container {
-
     position: fixed;
 
     inset: 0;
@@ -493,20 +445,17 @@ main {
 
     pointer-events: none;
 
+    transition:
+        opacity .2s;
 }
 
-
 .modal-container.active {
-
     opacity: 1;
 
     pointer-events: auto;
-
 }
 
-
 .modal {
-
     width: 100%;
 
     max-width: 500px;
@@ -520,41 +469,28 @@ main {
         1px solid var(--border);
 
     border-radius: 20px;
-
 }
-
 
 .modal h2 {
-
     margin-bottom: 20px;
-
 }
-
 
 .form-group {
-
     margin-bottom: 16px;
-
 }
 
-
 .form-group label {
-
     display: block;
 
     margin-bottom: 7px;
 
-    color:
-        var(--muted);
+    color: var(--muted);
 
     font-size: 13px;
-
 }
-
 
 .form-group input,
 .form-group textarea {
-
     width: 100%;
 
     padding: 12px 13px;
@@ -571,21 +507,15 @@ main {
         var(--text);
 
     outline: none;
-
 }
 
-
 .form-group textarea {
-
     min-height: 90px;
 
     resize: vertical;
-
 }
 
-
 .modal-actions {
-
     display: flex;
 
     justify-content:
@@ -594,13 +524,10 @@ main {
     gap: 10px;
 
     margin-top: 20px;
-
 }
-
 
 .cancel-button,
 .save-button {
-
     padding:
         11px 16px;
 
@@ -611,29 +538,144 @@ main {
     font-weight: 600;
 
     cursor: pointer;
-
 }
 
-
 .cancel-button {
-
     background:
         var(--surface-light);
 
     color:
         var(--text);
-
 }
 
-
 .save-button {
-
     background:
         white;
 
     color:
         #111;
+}
 
+.save-button:disabled {
+    opacity: .5;
+
+    cursor: wait;
+}
+
+
+/* =========================
+   VISOR DE FOTO
+========================= */
+
+.viewer {
+    position: fixed;
+
+    inset: 0;
+
+    z-index: 300;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    padding: 20px;
+
+    background:
+        rgba(0,0,0,.9);
+
+    opacity: 0;
+
+    pointer-events: none;
+
+    transition:
+        opacity .2s;
+}
+
+.viewer.active {
+    opacity: 1;
+
+    pointer-events: auto;
+}
+
+.viewer img {
+    max-width: 95vw;
+
+    max-height: 85vh;
+
+    object-fit: contain;
+
+    border-radius: 12px;
+}
+
+.viewer-close {
+    position: fixed;
+
+    top: 20px;
+    right: 20px;
+
+    width: 45px;
+    height: 45px;
+
+    border: none;
+
+    border-radius: 50%;
+
+    background:
+        rgba(255,255,255,.1);
+
+    color:
+        white;
+
+    font-size: 25px;
+
+    cursor: pointer;
+}
+
+
+/* =========================
+   MENSAJE
+========================= */
+
+.toast {
+    position: fixed;
+
+    left: 50%;
+    bottom: 25px;
+
+    z-index: 500;
+
+    transform:
+        translate(-50%,20px);
+
+    padding:
+        12px 18px;
+
+    border-radius: 12px;
+
+    background:
+        #ffffff;
+
+    color:
+        #111;
+
+    font-size: 14px;
+
+    opacity: 0;
+
+    pointer-events: none;
+
+    transition:
+        opacity .2s,
+        transform .2s;
+}
+
+.toast.active {
+    opacity: 1;
+
+    transform:
+        translate(-50%,0);
 }
 
 
@@ -644,35 +686,47 @@ main {
 @media (max-width:650px) {
 
     main {
-
         padding:
             25px 15px 50px;
-
     }
 
-
     .heading {
-
         align-items:
             flex-start;
 
         flex-direction:
             column;
-
     }
-
 
     .heading h1 {
-
-        font-size: 28px;
-
+        font-size:
+            28px;
     }
 
-
     .add-button {
-
         width: 100%;
+    }
 
+    .grid {
+        grid-template-columns:
+            repeat(2,minmax(0,1fr));
+
+        gap: 12px;
+    }
+
+    .card-content {
+        padding:
+            12px;
+    }
+
+    .card-title {
+        font-size:
+            15px;
+    }
+
+    .card-description {
+        font-size:
+            13px;
     }
 
 }
@@ -684,6 +738,10 @@ main {
 
 <body>
 
+
+<!-- =========================
+     TOPBAR
+========================= -->
 
 <header class="topbar">
 
@@ -706,12 +764,15 @@ main {
 
 
 
+<!-- =========================
+     SIDEBAR
+========================= -->
+
 <div
     id="overlay"
     class="overlay"
     onclick="cerrarMenu()">
 </div>
-
 
 
 <aside
@@ -797,6 +858,10 @@ main {
 
 
 
+<!-- =========================
+     CONTENIDO
+========================= -->
+
 <main>
 
 
@@ -818,6 +883,7 @@ main {
 
 
         <button
+            id="addButton"
             class="add-button"
             onclick="abrirModal()">
 
@@ -828,6 +894,8 @@ main {
     </div>
 
 
+
+    <!-- ESTADO VACÍO -->
 
     <section
         id="emptyState"
@@ -859,16 +927,33 @@ main {
     </section>
 
 
+
+    <!-- GALERÍA -->
+
+    <section
+        id="recuerdosGrid"
+        class="grid"
+        style="display:none;">
+    </section>
+
+
 </main>
 
 
 
+<!-- =========================
+     MODAL
+========================= -->
+
 <div
     id="modalContainer"
-    class="modal-container">
+    class="modal-container"
+    onclick="cerrarModalDesdeFondo(event)">
 
 
-    <div class="modal">
+    <div
+        class="modal"
+        onclick="event.stopPropagation()">
 
 
         <h2>
@@ -878,13 +963,14 @@ main {
 
         <div class="form-group">
 
-            <label>
+            <label for="foto">
                 Foto
             </label>
 
+
             <input
-                type="file"
                 id="foto"
+                type="file"
                 accept="image/*">
 
         </div>
@@ -892,13 +978,14 @@ main {
 
         <div class="form-group">
 
-            <label>
+            <label for="titulo">
                 Título
             </label>
 
+
             <input
-                type="text"
                 id="titulo"
+                type="text"
                 placeholder="Ej: Una tarde juntos">
 
         </div>
@@ -906,9 +993,10 @@ main {
 
         <div class="form-group">
 
-            <label>
+            <label for="descripcion">
                 Descripción
             </label>
+
 
             <textarea
                 id="descripcion"
@@ -920,13 +1008,14 @@ main {
 
         <div class="form-group">
 
-            <label>
+            <label for="fecha">
                 Fecha
             </label>
 
+
             <input
-                type="date"
-                id="fecha">
+                id="fecha"
+                type="date">
 
         </div>
 
@@ -944,6 +1033,7 @@ main {
 
 
             <button
+                id="guardarBtn"
                 class="save-button"
                 onclick="guardarRecuerdo()">
 
@@ -954,32 +1044,73 @@ main {
 
         </div>
 
+
     </div>
 
 </div>
 
 
 
-<!-- SUPABASE -->
+<!-- =========================
+     VISOR
+========================= -->
+
+<div
+    id="viewer"
+    class="viewer"
+    onclick="cerrarViewer(event)">
+
+
+    <button
+        class="viewer-close"
+        onclick="cerrarViewer()">
+
+        ×
+
+    </button>
+
+
+    <img
+        id="viewerImage"
+        src=""
+        alt="Recuerdo">
+
+</div>
+
+
+
+<!-- TOAST -->
+
+<div
+    id="toast"
+    class="toast">
+</div>
+
+
+
+<!-- =========================
+     SUPABASE
+========================= -->
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script src="js/supabase.js"></script>
 
 
-
 <script>
 
-/* =========================
-   COMPROBAR SESIÓN
-========================= */
+/* =====================================================
+   VARIABLES
+===================================================== */
+
+let usuarioActual = null;
+
+
+/* =====================================================
+   SESIÓN
+===================================================== */
 
 async function comprobarSesion() {
-
-    console.log(
-        "Comprobando sesión..."
-    );
-
 
     try {
 
@@ -997,57 +1128,50 @@ async function comprobarSesion() {
                 error
             );
 
-            return;
+            window.location.replace(
+                "./index.html"
+            );
 
+            return;
         }
 
-
-        /*
-         * Si no existe sesión,
-         * volvemos al login.
-         */
 
         if (
             !data ||
             !data.session
         ) {
 
-            console.log(
-                "No hay sesión. Volviendo al login."
-            );
-
             window.location.replace(
                 "./index.html"
             );
 
             return;
-
         }
 
 
-        /*
-         * Hay sesión.
-         */
-
-        console.log(
-            "Sesión encontrada:",
-            data.session.user.email
-        );
+        usuarioActual =
+            data.session.user;
 
 
         document
             .getElementById("emailUsuario")
             .textContent =
-            data.session.user.email || "";
+            usuarioActual.email || "";
 
+
+        await cargarRecuerdos();
 
     }
 
     catch (error) {
 
         console.error(
-            "Error inesperado:",
+            "Error comprobando sesión:",
             error
+        );
+
+        window.location.replace(
+            "./index.html"
         );
 
     }
@@ -1055,9 +1179,819 @@ async function comprobarSesion() {
 }
 
 
-/* =========================
+/* =====================================================
+   CARGAR RECUERDOS
+===================================================== */
+
+async function cargarRecuerdos() {
+
+    const emptyState =
+        document.getElementById(
+            "emptyState"
+        );
+
+
+    const grid =
+        document.getElementById(
+            "recuerdosGrid"
+        );
+
+
+    const {
+        data,
+        error
+    } =
+    await supabaseClient
+        .from("memories")
+        .select("*")
+        .order(
+            "date",
+            {
+                ascending: false
+            }
+        );
+
+
+    if (error) {
+
+        console.error(
+            "Error cargando recuerdos:",
+            error
+        );
+
+        mostrarToast(
+            "No se pudieron cargar los recuerdos."
+        );
+
+        return;
+    }
+
+
+    if (
+        !data ||
+        data.length === 0
+    ) {
+
+        emptyState.style.display =
+            "flex";
+
+        grid.style.display =
+            "none";
+
+        return;
+    }
+
+
+    emptyState.style.display =
+        "none";
+
+    grid.style.display =
+        "grid";
+
+
+    grid.innerHTML = "";
+
+
+    /*
+     * Generamos URLs temporales
+     * para las fotos privadas.
+     */
+
+    for (const recuerdo of data) {
+
+        if (
+            !recuerdo.storage_path
+        ) {
+
+            continue;
+        }
+
+
+        const {
+            data: signedData,
+            error: signedError
+        } =
+        await supabaseClient
+            .storage
+            .from("recuerdos")
+            .createSignedUrl(
+                recuerdo.storage_path,
+                3600
+            );
+
+
+        if (signedError) {
+
+            console.error(
+                "Error creando URL:",
+                signedError
+            );
+
+            continue;
+        }
+
+
+        crearTarjeta(
+            recuerdo,
+            signedData.signedUrl
+        );
+
+    }
+
+}
+
+
+/* =====================================================
+   CREAR TARJETA
+===================================================== */
+
+function crearTarjeta(
+    recuerdo,
+    imageUrl
+) {
+
+    const grid =
+        document.getElementById(
+            "recuerdosGrid"
+        );
+
+
+    const card =
+        document.createElement(
+            "article"
+        );
+
+    card.className =
+        "card";
+
+
+    const image =
+        document.createElement(
+            "img"
+        );
+
+    image.className =
+        "card-image";
+
+    image.src =
+        imageUrl;
+
+    image.alt =
+        recuerdo.title ||
+        "Recuerdo";
+
+    image.loading =
+        "lazy";
+
+
+    image.addEventListener(
+        "click",
+        function() {
+
+            abrirViewer(
+                imageUrl
+            );
+
+        }
+    );
+
+
+    const content =
+        document.createElement(
+            "div"
+        );
+
+    content.className =
+        "card-content";
+
+
+    const title =
+        document.createElement(
+            "div"
+        );
+
+    title.className =
+        "card-title";
+
+    title.textContent =
+        recuerdo.title ||
+        "Sin título";
+
+
+    const description =
+        document.createElement(
+            "div"
+        );
+
+    description.className =
+        "card-description";
+
+    description.textContent =
+        recuerdo.description ||
+        "";
+
+
+    const date =
+        document.createElement(
+            "div"
+        );
+
+    date.className =
+        "card-date";
+
+    date.textContent =
+        formatearFecha(
+            recuerdo.date
+        );
+
+
+    content.appendChild(
+        title
+    );
+
+    content.appendChild(
+        description
+    );
+
+    content.appendChild(
+        date
+    );
+
+
+    card.appendChild(
+        image
+    );
+
+    card.appendChild(
+        content
+    );
+
+
+    grid.appendChild(
+        card
+    );
+
+}
+
+
+/* =====================================================
+   SUBIR RECUERDO
+===================================================== */
+
+async function guardarRecuerdo() {
+
+    const archivo =
+        document.getElementById(
+            "foto"
+        ).files[0];
+
+
+    const titulo =
+        document.getElementById(
+            "titulo"
+        ).value.trim();
+
+
+    const descripcion =
+        document.getElementById(
+            "descripcion"
+        ).value.trim();
+
+
+    const fecha =
+        document.getElementById(
+            "fecha"
+        ).value;
+
+
+    const boton =
+        document.getElementById(
+            "guardarBtn"
+        );
+
+
+    /*
+     * Validaciones
+     */
+
+    if (!archivo) {
+
+        mostrarToast(
+            "Seleccioná una foto."
+        );
+
+        return;
+    }
+
+
+    if (
+        !archivo.type.startsWith(
+            "image/"
+        )
+    ) {
+
+        mostrarToast(
+            "El archivo debe ser una imagen."
+        );
+
+        return;
+    }
+
+
+    /*
+     * Límite de seguridad.
+     * No necesitamos fotos gigantes
+     * para esta primera versión.
+     */
+
+    const maxSize =
+        20 * 1024 * 1024;
+
+
+    if (
+        archivo.size > maxSize
+    ) {
+
+        mostrarToast(
+            "La imagen no puede superar los 20 MB."
+        );
+
+        return;
+    }
+
+
+    if (!usuarioActual) {
+
+        mostrarToast(
+            "La sesión no está disponible."
+        );
+
+        return;
+    }
+
+
+    boton.disabled =
+        true;
+
+    boton.textContent =
+        "Subiendo...";
+
+
+    let rutaArchivo = null;
+
+
+    try {
+
+        /*
+         * Obtener extensión.
+         */
+
+        const nombreOriginal =
+            archivo.name;
+
+
+        const partes =
+            nombreOriginal
+                .split(".");
+
+
+        const extension =
+            partes.length > 1
+                ? partes.pop().toLowerCase()
+                : "jpg";
+
+
+        /*
+         * Crear nombre único.
+         */
+
+        const nombreUnico =
+            Date.now()
+            + "-"
+            + Math.random()
+                .toString(36)
+                .substring(2)
+            + "."
+            + extension;
+
+
+        /*
+         * Cada usuario tendrá
+         * su propia carpeta.
+         */
+
+        rutaArchivo =
+            "fotos/"
+            + usuarioActual.id
+            + "/"
+            + nombreUnico;
+
+
+        /*
+         * SUBIR FOTO
+         */
+
+        const {
+            error: uploadError
+        } =
+        await supabaseClient
+            .storage
+            .from("recuerdos")
+            .upload(
+                rutaArchivo,
+                archivo,
+                {
+                    cacheControl: "3600",
+                    upsert: false,
+                    contentType:
+                        archivo.type
+                }
+            );
+
+
+        if (uploadError) {
+
+            console.error(
+                "Error subiendo imagen:",
+                uploadError
+            );
+
+            throw uploadError;
+        }
+
+
+        /*
+         * GUARDAR DATOS EN LA TABLA
+         */
+
+        const {
+            error: databaseError
+        } =
+        await supabaseClient
+            .from("memories")
+            .insert({
+
+                title:
+                    titulo ||
+                    "Sin título",
+
+                description:
+                    descripcion ||
+                    "",
+
+                date:
+                    fecha ||
+                    new Date()
+                        .toISOString()
+                        .split("T")[0],
+
+                media_type:
+                    "photo",
+
+                storage_path:
+                    rutaArchivo,
+
+                created_by:
+                    usuarioActual.id
+
+            });
+
+
+        if (databaseError) {
+
+            console.error(
+                "Error guardando información:",
+                databaseError
+            );
+
+
+            /*
+             * Si la base de datos falla,
+             * intentamos borrar la foto
+             * para no dejar un archivo huérfano.
+             */
+
+            await supabaseClient
+                .storage
+                .from("recuerdos")
+                .remove([
+                    rutaArchivo
+                ]);
+
+
+            throw databaseError;
+        }
+
+
+        /*
+         * Todo salió bien.
+         */
+
+        mostrarToast(
+            "Recuerdo guardado ❤️"
+        );
+
+
+        limpiarFormulario();
+
+        cerrarModal();
+
+
+        await cargarRecuerdos();
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Error guardando recuerdo:",
+            error
+        );
+
+
+        mostrarToast(
+            "No se pudo guardar el recuerdo."
+        );
+
+    }
+
+    finally {
+
+        boton.disabled =
+            false;
+
+        boton.textContent =
+            "Guardar recuerdo";
+
+    }
+
+}
+
+
+/* =====================================================
+   LIMPIAR FORMULARIO
+===================================================== */
+
+function limpiarFormulario() {
+
+    document.getElementById(
+        "foto"
+    ).value = "";
+
+
+    document.getElementById(
+        "titulo"
+    ).value = "";
+
+
+    document.getElementById(
+        "descripcion"
+    ).value = "";
+
+
+    document.getElementById(
+        "fecha"
+    ).value = "";
+
+}
+
+
+/* =====================================================
+   FORMATEAR FECHA
+===================================================== */
+
+function formatearFecha(
+    fecha
+) {
+
+    if (!fecha) {
+
+        return "";
+
+    }
+
+
+    const partes =
+        fecha.split("-");
+
+
+    if (
+        partes.length !== 3
+    ) {
+
+        return fecha;
+
+    }
+
+
+    return (
+        partes[2]
+        + "/"
+        + partes[1]
+        + "/"
+        + partes[0]
+    );
+
+}
+
+
+/* =====================================================
+   VISOR
+===================================================== */
+
+function abrirViewer(
+    url
+) {
+
+    document
+        .getElementById(
+            "viewerImage"
+        )
+        .src =
+        url;
+
+
+    document
+        .getElementById(
+            "viewer"
+        )
+        .classList
+        .add("active");
+
+}
+
+
+function cerrarViewer(
+    event
+) {
+
+    if (
+        event &&
+        event.target !==
+        document.getElementById(
+            "viewer"
+        )
+    ) {
+
+        return;
+
+    }
+
+
+    document
+        .getElementById(
+            "viewer"
+        )
+        .classList
+        .remove("active");
+
+
+    document
+        .getElementById(
+            "viewerImage"
+        )
+        .src = "";
+
+}
+
+
+/* =====================================================
+   MENÚ
+===================================================== */
+
+function abrirMenu() {
+
+    document
+        .getElementById(
+            "sidebar"
+        )
+        .classList
+        .add("active");
+
+
+    document
+        .getElementById(
+            "overlay"
+        )
+        .classList
+        .add("active");
+
+}
+
+
+function cerrarMenu() {
+
+    document
+        .getElementById(
+            "sidebar"
+        )
+        .classList
+        .remove("active");
+
+
+    document
+        .getElementById(
+            "overlay"
+        )
+        .classList
+        .remove("active");
+
+}
+
+
+/* =====================================================
+   MODAL
+===================================================== */
+
+function abrirModal() {
+
+    document
+        .getElementById(
+            "modalContainer"
+        )
+        .classList
+        .add("active");
+
+}
+
+
+function cerrarModal() {
+
+    document
+        .getElementById(
+            "modalContainer"
+        )
+        .classList
+        .remove("active");
+
+}
+
+
+function cerrarModalDesdeFondo(
+    event
+) {
+
+    if (
+        event.target ===
+        document.getElementById(
+            "modalContainer"
+        )
+    ) {
+
+        cerrarModal();
+
+    }
+
+}
+
+
+/* =====================================================
+   TOAST
+===================================================== */
+
+let toastTimeout;
+
+
+function mostrarToast(
+    mensaje
+) {
+
+    const toast =
+        document.getElementById(
+            "toast"
+        );
+
+
+    toast.textContent =
+        mensaje;
+
+
+    toast.classList
+        .add("active");
+
+
+    clearTimeout(
+        toastTimeout
+    );
+
+
+    toastTimeout =
+        setTimeout(
+            function() {
+
+                toast.classList
+                    .remove("active");
+
+            },
+            3000
+        );
+
+}
+
+
+/* =====================================================
    CERRAR SESIÓN
-========================= */
+===================================================== */
 
 async function cerrarSesion() {
 
@@ -1069,7 +2003,8 @@ async function cerrarSesion() {
 
     if (boton) {
 
-        boton.disabled = true;
+        boton.disabled =
+            true;
 
         boton.innerHTML =
             "↪ <span>Cerrando sesión...</span>";
@@ -1077,17 +2012,14 @@ async function cerrarSesion() {
     }
 
 
-    console.log(
-        "Cerrando sesión..."
-    );
-
-
     try {
 
         const {
             error
         } =
-        await supabaseClient.auth.signOut();
+        await supabaseClient
+            .auth
+            .signOut();
 
 
         if (error) {
@@ -1100,37 +2032,19 @@ async function cerrarSesion() {
         }
 
 
-        console.log(
-            "Sesión cerrada."
-        );
-
-
-        /*
-         * IMPORTANTE:
-         *
-         * replace() elimina recuerdos.html
-         * del historial inmediato.
-         */
-
         window.location.replace(
             "./index.html"
         );
-
 
     }
 
     catch (error) {
 
         console.error(
-            "Error inesperado al cerrar sesión:",
+            "Error inesperado:",
             error
         );
 
-
-        /*
-         * Aunque exista un error,
-         * volvemos al login.
-         */
 
         window.location.replace(
             "./index.html"
@@ -1141,76 +2055,9 @@ async function cerrarSesion() {
 }
 
 
-/* =========================
-   MENÚ
-========================= */
-
-function abrirMenu() {
-
-    document
-        .getElementById("sidebar")
-        .classList.add("active");
-
-
-    document
-        .getElementById("overlay")
-        .classList.add("active");
-
-}
-
-
-function cerrarMenu() {
-
-    document
-        .getElementById("sidebar")
-        .classList.remove("active");
-
-
-    document
-        .getElementById("overlay")
-        .classList.remove("active");
-
-}
-
-
-/* =========================
-   MODAL
-========================= */
-
-function abrirModal() {
-
-    document
-        .getElementById("modalContainer")
-        .classList.add("active");
-
-}
-
-
-function cerrarModal() {
-
-    document
-        .getElementById("modalContainer")
-        .classList.remove("active");
-
-}
-
-
-/* =========================
-   GUARDAR
-========================= */
-
-function guardarRecuerdo() {
-
-    alert(
-        "La subida de fotos la conectaremos en el próximo paso 📸"
-    );
-
-}
-
-
-/* =========================
+/* =====================================================
    INICIO
-========================= */
+===================================================== */
 
 document.addEventListener(
     "DOMContentLoaded",
@@ -1222,7 +2069,6 @@ document.addEventListener(
 );
 
 </script>
-
 
 </body>
 </html>
