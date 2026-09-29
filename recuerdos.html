@@ -1013,60 +1013,36 @@ async function guardarRecuerdo() {
 ========================= */
 
 async function cerrarSesion() {
-
-    const boton =
-        document.querySelector(".logout");
-
     try {
+        console.log("Cerrando sesión...");
 
-        if (boton) {
-
-            boton.disabled = true;
-
-            boton.style.opacity = "0.5";
-
-        }
-
-
-        const {
-            error
-        } = await supabaseClient.auth.signOut();
-
+        // Cerrar la sesión local de Supabase
+        const { error } = await supabaseClient.auth.signOut({
+            scope: "local"
+        });
 
         if (error) {
-
-            console.error(
-                "Error al cerrar sesión:",
-                error
-            );
-
+            console.error("Error al cerrar sesión:", error);
         }
 
+        // Eliminar cualquier sesión almacenada localmente
+        localStorage.clear();
+        sessionStorage.clear();
 
-        /*
-         * replace() evita que el navegador
-         * conserve recuerdos.html en el historial.
-         */
+        console.log("Sesión eliminada. Volviendo al login...");
 
-        window.location.replace("index.html");
-
+        // Forzar una navegación completamente nueva al login
+        window.location.href = "./index.html";
 
     } catch (error) {
+        console.error("Error inesperado al cerrar sesión:", error);
 
-        console.error(
-            "Error inesperado al cerrar sesión:",
-            error
-        );
+        // Incluso si Supabase falla, limpiamos el navegador
+        localStorage.clear();
+        sessionStorage.clear();
 
-        /*
-         * Aunque ocurra un error,
-         * volvemos al login.
-         */
-
-        window.location.replace("index.html");
-
+        window.location.href = "./index.html";
     }
-
 }
 
 
