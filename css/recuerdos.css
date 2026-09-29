@@ -1828,3 +1828,46 @@ body.menu-open
 body.menu-open .sidebar {
     transform: translateX(0) !important;
 }
+/* =========================================
+   PRUEBA DE CLICS
+========================================= */
+
+.menu-overlay {
+    pointer-events: none !important;
+}
+
+.modal {
+    pointer-events: none;
+}
+
+.modal.active {
+    pointer-events: auto;
+}
+
+.viewer {
+    pointer-events: none;
+}
+
+.viewer.active {
+    pointer-events: auto;
+}
+.menu-toggle {
+    pointer-events: auto !important;
+    z-index: 99999 !important;
+}
+
+.add-memory {
+    pointer-events: auto !important;
+    position: relative;
+    z-index: 100;
+}
+
+.sidebar {
+    pointer-events: auto !important;
+}
+
+.navigation,
+.nav-item,
+.logout-button {
+    pointer-events: auto !important;
+}
