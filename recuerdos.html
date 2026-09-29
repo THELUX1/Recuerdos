@@ -1611,13 +1611,19 @@ async function guardarRecuerdo() {
 
         if (uploadError) {
 
-            console.error(
-                "Error subiendo imagen:",
-                uploadError
-            );
+    console.error(
+        "Error subiendo imagen:",
+        uploadError
+    );
 
-            throw uploadError;
-        }
+    alert(
+        "ERROR DE SUPABASE\n\n" +
+        "Mensaje: " + (uploadError.message || "desconocido") +
+        "\n\nCódigo: " + (uploadError.statusCode || "sin código")
+    );
+
+    throw uploadError;
+}
 
 
         /*
