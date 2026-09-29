@@ -4,135 +4,567 @@ const GOOGLE_CLIENT_ID =
 const GOOGLE_DRIVE_SCOPE =
     "https://www.googleapis.com/auth/drive.file";
 
+
 let googleAccessToken = null;
 let recuerdosFolderId = null;
 
+let googleTokenClient = null;
 
-/* ================================
-   AUTORIZAR GOOGLE DRIVE
-================================ */
+let googleAuthPromise = null;
 
-function iniciarGoogleDrive() {
 
-    if (!window.google || !google.accounts) {
-        console.error("Google Identity Services no está cargado.");
+/* =========================================
+   MOSTRAR ESTADO
+========================================= */
+
+function mostrarEstadoDrive(mensaje) {
+
+    const elemento =
+        document.getElementById("googleDriveStatus");
+
+    if (!elemento) {
         return;
     }
 
-    const client = google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_CLIENT_ID,
-
-        scope: GOOGLE_DRIVE_SCOPE,
-
-        callback: async (response) => {
-
-            if (response.error) {
-                console.error("Error de Google:", response);
-                return;
-            }
-
-            googleAccessToken = response.access_token;
-
-            console.log("✅ Google Drive autorizado");
-
-            await obtenerOCrearCarpeta();
-        }
-    });
-
-    client.requestAccessToken();
+    elemento.textContent = mensaje;
 }
 
 
-/* ================================
-   BUSCAR / CREAR CARPETA
-================================ */
+/* =========================================
+   AUTORIZAR GOOGLE DRIVE
+========================================= */
 
-async function obtenerOCrearCarpeta() {
+function iniciarGoogleDrive() {
 
-    if (!googleAccessToken) {
-        console.error("No hay token de Google.");
-        return;
-    }
+    return new Promise((resolve, reject) => {
 
-    try {
+        if (
+            !window.google ||
+            !window.google.accounts ||
+            !window.google.accounts.oauth2
+        ) {
 
-        // Buscar carpeta existente
-        const buscar = await fetch(
-            "https://www.googleapis.com/drive/v3/files?" +
-            new URLSearchParams({
-                q: "name = 'Nuestra Historia' and mimeType = 'application/vnd.google-apps.folder' and trashed = false",
-                spaces: "drive",
-                fields: "files(id,name)"
-            }),
-            {
-                headers: {
-                    Authorization: `Bearer ${googleAccessToken}`
-                }
-            }
-        );
+            const error =
+                new Error(
+                    "Google Identity Services no está disponible."
+                );
 
-        if (!buscar.ok) {
-            throw new Error("No se pudo buscar la carpeta.");
-        }
+            console.error(error);
 
-        const resultado = await buscar.json();
-
-        if (resultado.files && resultado.files.length > 0) {
-
-            recuerdosFolderId = resultado.files[0].id;
-
-            console.log(
-                "📁 Carpeta encontrada:",
-                recuerdosFolderId
-            );
+            reject(error);
 
             return;
         }
 
 
-        // Crear carpeta
-        const crear = await fetch(
+        googleTokenClient =
+            google.accounts.oauth2.initTokenClient({
+
+                client_id:
+                    GOOGLE_CLIENT_ID,
+
+                scope:
+                    GOOGLE_DRIVE_SCOPE,
+
+                callback:
+                    async (response) => {
+
+                        if (response.error) {
+
+                            console.error(
+                                "Error de Google:",
+                                response
+                            );
+
+                            googleAuthPromise = null;
+
+                            reject(
+                                new Error(
+                                    "Google no autorizó el acceso."
+                                )
+                            );
+
+                            return;
+                        }
+
+
+                        googleAccessToken =
+                            response.access_token;
+
+
+                        try {
+
+                            await obtenerOCrearCarpeta();
+
+
+                            mostrarEstadoDrive(
+                                "✓ Google Drive conectado"
+                            );
+
+
+                            console.log(
+                                "Google Drive conectado correctamente."
+                            );
+
+
+                            resolve(
+                                googleAccessToken
+                            );
+
+                        } catch (error) {
+
+                            googleAuthPromise = null;
+
+                            reject(error);
+                        }
+
+                    }
+
+            });
+
+
+        googleTokenClient.requestAccessToken({
+            prompt: ""
+        });
+
+    });
+
+}
+
+
+/* =========================================
+   ASEGURAR AUTORIZACIÓN
+========================================= */
+
+async function asegurarGoogleDrive() {
+
+    if (googleAccessToken) {
+
+        return true;
+    }
+
+
+    if (googleAuthPromise) {
+
+        await googleAuthPromise;
+
+        return true;
+    }
+
+
+    googleAuthPromise =
+        iniciarGoogleDrive();
+
+
+    try {
+
+        await googleAuthPromise;
+
+        return true;
+
+    } catch (error) {
+
+        googleAuthPromise = null;
+
+        console.error(
+            "No se pudo conectar Google Drive:",
+            error
+        );
+
+        return false;
+    }
+
+}
+
+
+/* =========================================
+   CARPETA
+========================================= */
+
+async function obtenerOCrearCarpeta() {
+
+    if (!googleAccessToken) {
+
+        throw new Error(
+            "No hay autorización de Google Drive."
+        );
+    }
+
+
+    const query =
+        "name = 'Nuestra Historia'" +
+        " and mimeType = 'application/vnd.google-apps.folder'" +
+        " and trashed = false";
+
+
+    const respuesta =
+        await fetch(
+            "https://www.googleapis.com/drive/v3/files?" +
+            new URLSearchParams({
+
+                q: query,
+
+                spaces: "drive",
+
+                fields: "files(id,name)"
+
+            }),
+            {
+                headers: {
+
+                    Authorization:
+                        `Bearer ${googleAccessToken}`
+
+                }
+            }
+        );
+
+
+    if (!respuesta.ok) {
+
+        const texto =
+            await respuesta.text();
+
+        throw new Error(
+            "No se pudo buscar la carpeta: " +
+            texto
+        );
+    }
+
+
+    const resultado =
+        await respuesta.json();
+
+
+    if (
+        resultado.files &&
+        resultado.files.length > 0
+    ) {
+
+        recuerdosFolderId =
+            resultado.files[0].id;
+
+
+        return recuerdosFolderId;
+    }
+
+
+    /* CREAR CARPETA */
+
+    const crear =
+        await fetch(
             "https://www.googleapis.com/drive/v3/files",
             {
                 method: "POST",
 
                 headers: {
-                    Authorization: `Bearer ${googleAccessToken}`,
-                    "Content-Type": "application/json"
+
+                    Authorization:
+                        `Bearer ${googleAccessToken}`,
+
+                    "Content-Type":
+                        "application/json"
+
                 },
 
                 body: JSON.stringify({
-                    name: "Nuestra Historia",
-                    mimeType: "application/vnd.google-apps.folder"
+
+                    name:
+                        "Nuestra Historia",
+
+                    mimeType:
+                        "application/vnd.google-apps.folder"
+
                 })
             }
         );
 
-        if (!crear.ok) {
-            throw new Error("No se pudo crear la carpeta.");
-        }
 
-        const carpeta = await crear.json();
+    if (!crear.ok) {
 
-        recuerdosFolderId = carpeta.id;
+        const texto =
+            await crear.text();
 
-        console.log(
-            "📁 Carpeta creada correctamente:",
-            recuerdosFolderId
-        );
-
-    } catch (error) {
-
-        console.error(
-            "❌ Error con la carpeta de Google Drive:",
-            error
+        throw new Error(
+            "No se pudo crear la carpeta: " +
+            texto
         );
     }
+
+
+    const carpeta =
+        await crear.json();
+
+
+    recuerdosFolderId =
+        carpeta.id;
+
+
+    return recuerdosFolderId;
 }
 
 
-/* ================================
-   EXPORTAR
-================================ */
+/* =========================================
+   SUBIR ARCHIVO
+========================================= */
 
-window.iniciarGoogleDrive = iniciarGoogleDrive;
+async function subirArchivoADrive(file) {
+
+    if (!file) {
+
+        throw new Error(
+            "No se recibió ningún archivo."
+        );
+    }
+
+
+    const autorizado =
+        await asegurarGoogleDrive();
+
+
+    if (!autorizado) {
+
+        throw new Error(
+            "Google Drive no está autorizado."
+        );
+    }
+
+
+    if (!recuerdosFolderId) {
+
+        await obtenerOCrearCarpeta();
+    }
+
+
+    const metadata = {
+
+        name:
+            file.name,
+
+        parents:
+            [recuerdosFolderId],
+
+        mimeType:
+            file.type ||
+            "application/octet-stream"
+
+    };
+
+
+    const formData =
+        new FormData();
+
+
+    formData.append(
+
+        "metadata",
+
+        new Blob(
+            [
+                JSON.stringify(metadata)
+            ],
+            {
+                type:
+                    "application/json"
+            }
+        )
+
+    );
+
+
+    formData.append(
+        "file",
+        file
+    );
+
+
+    const respuesta =
+        await fetch(
+
+            "https://www.googleapis.com/upload/drive/v3/files?" +
+            new URLSearchParams({
+
+                uploadType:
+                    "multipart",
+
+                fields:
+                    "id,name,mimeType,size"
+
+            }),
+
+            {
+
+                method:
+                    "POST",
+
+                headers: {
+
+                    Authorization:
+                        `Bearer ${googleAccessToken}`
+
+                },
+
+                body:
+                    formData
+
+            }
+
+        );
+
+
+    if (!respuesta.ok) {
+
+        const texto =
+            await respuesta.text();
+
+        throw new Error(
+            "Error subiendo archivo a Google Drive: " +
+            texto
+        );
+    }
+
+
+    const archivo =
+        await respuesta.json();
+
+
+    console.log(
+        "Archivo subido a Google Drive:",
+        archivo
+    );
+
+
+    return archivo;
+}
+
+
+/* =========================================
+   OBTENER ARCHIVO
+========================================= */
+
+async function obtenerArchivoDrive(fileId) {
+
+    const autorizado =
+        await asegurarGoogleDrive();
+
+
+    if (!autorizado) {
+
+        throw new Error(
+            "Google Drive no está autorizado."
+        );
+    }
+
+
+    const respuesta =
+        await fetch(
+
+            `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`,
+
+            {
+
+                headers: {
+
+                    Authorization:
+                        `Bearer ${googleAccessToken}`
+
+                }
+
+            }
+
+        );
+
+
+    if (!respuesta.ok) {
+
+        const texto =
+            await respuesta.text();
+
+        throw new Error(
+            "No se pudo obtener el archivo: " +
+            texto
+        );
+    }
+
+
+    return await respuesta.blob();
+}
+
+
+/* =========================================
+   ELIMINAR ARCHIVO
+========================================= */
+
+async function eliminarArchivoDrive(fileId) {
+
+    if (!fileId) {
+        return;
+    }
+
+
+    const autorizado =
+        await asegurarGoogleDrive();
+
+
+    if (!autorizado) {
+
+        throw new Error(
+            "Google Drive no está autorizado."
+        );
+    }
+
+
+    const respuesta =
+        await fetch(
+
+            `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`,
+
+            {
+
+                method:
+                    "DELETE",
+
+                headers: {
+
+                    Authorization:
+                        `Bearer ${googleAccessToken}`
+
+                }
+
+            }
+
+        );
+
+
+    if (!respuesta.ok) {
+
+        const texto =
+            await respuesta.text();
+
+        throw new Error(
+            "No se pudo eliminar el archivo: " +
+            texto
+        );
+    }
+
+}
+
+
+/* =========================================
+   EXPONER FUNCIONES
+========================================= */
+
+window.iniciarGoogleDrive =
+    iniciarGoogleDrive;
+
+window.asegurarGoogleDrive =
+    asegurarGoogleDrive;
+
+window.subirArchivoADrive =
+    subirArchivoADrive;
+
+window.obtenerArchivoDrive =
+    obtenerArchivoDrive;
+
+window.eliminarArchivoDrive =
+    eliminarArchivoDrive;

@@ -1,37 +1,39 @@
 /* =========================================
-   NUESTRA HISTORIA
-   recuerdos.js
-   Supabase + Google Drive
+   ESTADO
 ========================================= */
-alert("recuerdos.js cargó correctamente");
+
 let recuerdos = [];
-let googleDrivePreparado = false;
+
+let seccionActual = "momentos";
+
+let archivoSeleccionado = null;
 
 
 /* =========================================
    INICIO
 ========================================= */
 
-document.addEventListener("DOMContentLoaded", async () => {
+document.addEventListener(
+    "DOMContentLoaded",
+    async () => {
 
-    console.log("📖 Nuestra Historia iniciando...");
+        console.log(
+            "recuerdos.js cargado correctamente"
+        );
 
-    try {
+
+        configurarEventos();
+
 
         const {
-            data,
-            error
-        } = await supabaseClient.auth.getSession();
+            data: {
+                session
+            }
+        } =
+            await supabaseClient.auth.getSession();
 
-        if (error) {
-            console.error(
-                "Error obteniendo sesión:",
-                error
-            );
-            return;
-        }
 
-        if (!data.session) {
+        if (!session) {
 
             window.location.replace(
                 "./index.html"
@@ -40,38 +42,287 @@ document.addEventListener("DOMContentLoaded", async () => {
             return;
         }
 
-        console.log(
-            "✅ Sesión de Supabase activa"
-        );
 
-
-        /* Mostrar email */
-
-        const emailUsuario =
+        const email =
             document.getElementById(
                 "emailUsuario"
             );
 
-        if (emailUsuario) {
 
-            emailUsuario.textContent =
-                data.session.user.email;
+        if (email) {
+
+            email.textContent =
+                session.user.email || "";
         }
 
 
-        /* Cargar recuerdos */
-
         await cargarRecuerdos();
 
-
-    } catch (error) {
-
-        console.error(
-            "❌ Error iniciando aplicación:",
-            error
-        );
     }
-});
+);
+
+
+/* =========================================
+   EVENTOS
+========================================= */
+
+function configurarEventos() {
+
+    /* MENU */
+
+    const menuToggle =
+        document.getElementById(
+            "menuToggle"
+        );
+
+    const menuOverlay =
+        document.getElementById(
+            "menuOverlay"
+        );
+
+
+    if (menuToggle) {
+
+        menuToggle.addEventListener(
+            "click",
+            alternarMenu
+        );
+
+    }
+
+
+    if (menuOverlay) {
+
+        menuOverlay.addEventListener(
+            "click",
+            cerrarMenu
+        );
+
+    }
+
+
+    /* NUEVO RECUERDO */
+
+    const addButton =
+        document.getElementById(
+            "addMemoryButton"
+        );
+
+
+    if (addButton) {
+
+        addButton.addEventListener(
+            "click",
+            abrirModal
+        );
+
+    }
+
+
+    /* CERRAR MODAL */
+
+    const modalClose =
+        document.getElementById(
+            "modalClose"
+        );
+
+
+    if (modalClose) {
+
+        modalClose.addEventListener(
+            "click",
+            cerrarModal
+        );
+
+    }
+
+
+    /* CLICK FUERA DEL MODAL */
+
+    const modal =
+        document.getElementById(
+            "modal"
+        );
+
+
+    if (modal) {
+
+        modal.addEventListener(
+            "click",
+            event => {
+
+                if (
+                    event.target === modal
+                ) {
+
+                    cerrarModal();
+
+                }
+
+            }
+        );
+
+    }
+
+
+    /* FORM */
+
+    const form =
+        document.getElementById(
+            "memoryForm"
+        );
+
+
+    if (form) {
+
+        form.addEventListener(
+            "submit",
+            guardarRecuerdo
+        );
+
+    }
+
+
+    /* ARCHIVO */
+
+    const archivo =
+        document.getElementById(
+            "archivo"
+        );
+
+
+    if (archivo) {
+
+        archivo.addEventListener(
+            "change",
+            manejarArchivo
+        );
+
+    }
+
+
+    /* VIEWER */
+
+    const viewer =
+        document.getElementById(
+            "viewer"
+        );
+
+
+    const viewerClose =
+        document.getElementById(
+            "viewerClose"
+        );
+
+
+    if (viewerClose) {
+
+        viewerClose.addEventListener(
+            "click",
+            cerrarViewer
+        );
+
+    }
+
+
+    if (viewer) {
+
+        viewer.addEventListener(
+            "click",
+            event => {
+
+                if (
+                    event.target === viewer
+                ) {
+
+                    cerrarViewer();
+
+                }
+
+            }
+        );
+
+    }
+
+
+    /* DRIVE */
+
+    const driveButton =
+        document.getElementById(
+            "googleDriveButton"
+        );
+
+
+    if (driveButton) {
+
+        driveButton.addEventListener(
+            "click",
+            conectarGoogleDrive
+        );
+
+    }
+
+
+    /* LOGOUT */
+
+    const logoutButton =
+        document.getElementById(
+            "logoutButton"
+        );
+
+
+    if (logoutButton) {
+
+        logoutButton.addEventListener(
+            "click",
+            cerrarSesion
+        );
+
+    }
+
+
+    /* NAVEGACIÓN */
+
+    document
+        .querySelectorAll(".nav-item")
+        .forEach(
+            button => {
+
+                button.addEventListener(
+                    "click",
+                    () => {
+
+                        cambiarSeccion(
+                            button.dataset.section
+                        );
+
+                    }
+                );
+
+            }
+        );
+
+
+    /* ESC */
+
+    document.addEventListener(
+        "keydown",
+        event => {
+
+            if (event.key === "Escape") {
+
+                cerrarModal();
+
+                cerrarViewer();
+
+                cerrarMenu();
+
+            }
+
+        }
+    );
+
+}
 
 
 /* =========================================
@@ -81,110 +332,109 @@ document.addEventListener("DOMContentLoaded", async () => {
 function alternarMenu() {
 
     const sidebar =
-        document.querySelector(".sidebar");
+        document.getElementById(
+            "sidebar"
+        );
 
     const overlay =
-        document.getElementById("menuOverlay");
+        document.getElementById(
+            "menuOverlay"
+        );
 
-    const boton =
-        document.getElementById("menuToggle");
+    const toggle =
+        document.getElementById(
+            "menuToggle"
+        );
+
 
     if (!sidebar) {
-        console.error("No se encontró .sidebar");
         return;
     }
 
+
     const abierto =
-        sidebar.classList.contains("open") ||
-        sidebar.classList.contains("active");
+        sidebar.classList.contains(
+            "open"
+        );
+
 
     if (abierto) {
 
-        sidebar.classList.remove("open");
-        sidebar.classList.remove("active");
-
-        if (overlay) {
-            overlay.classList.remove("open");
-            overlay.classList.remove("active");
-        }
-
-        if (boton) {
-            boton.setAttribute(
-                "aria-expanded",
-                "false"
-            );
-        }
+        cerrarMenu();
 
     } else {
 
-        sidebar.classList.add("open");
+        sidebar.classList.add(
+            "open"
+        );
 
         if (overlay) {
-            overlay.classList.add("open");
+
+            overlay.classList.add(
+                "active"
+            );
+
         }
 
-        if (boton) {
-            boton.setAttribute(
+        if (toggle) {
+
+            toggle.setAttribute(
                 "aria-expanded",
                 "true"
             );
+
         }
+
     }
+
 }
 
 
 function cerrarMenu() {
 
     const sidebar =
-        document.querySelector(".sidebar");
+        document.getElementById(
+            "sidebar"
+        );
 
     const overlay =
-        document.getElementById("menuOverlay");
+        document.getElementById(
+            "menuOverlay"
+        );
 
-    const boton =
-        document.getElementById("menuToggle");
+    const toggle =
+        document.getElementById(
+            "menuToggle"
+        );
 
 
     if (sidebar) {
-        sidebar.classList.remove("open");
-        sidebar.classList.remove("active");
+
+        sidebar.classList.remove(
+            "open"
+        );
+
     }
+
 
     if (overlay) {
-        overlay.classList.remove("open");
-        overlay.classList.remove("active");
+
+        overlay.classList.remove(
+            "active"
+        );
+
     }
 
-    if (boton) {
-        boton.setAttribute(
+
+    if (toggle) {
+
+        toggle.setAttribute(
             "aria-expanded",
             "false"
         );
+
     }
-}
 
-
-/* =========================================
-   CERRAR SESIÓN
-========================================= */
-
-async function cerrarSesion() {
-
-    try {
-
-        await supabaseClient.auth.signOut();
-
-        window.location.replace(
-            "./index.html"
-        );
-
-    } catch (error) {
-
-        console.error(
-            "Error cerrando sesión:",
-            error
-        );
-    }
 }
 
 
@@ -212,12 +462,11 @@ async function cargarRecuerdos() {
     `;
 
 
-    try {
-
-        const {
-            data,
-            error
-        } = await supabaseClient
+    const {
+        data,
+        error
+    } =
+        await supabaseClient
             .from("memories")
             .select("*")
             .order(
@@ -228,70 +477,159 @@ async function cargarRecuerdos() {
             );
 
 
-        if (error) {
-            throw error;
-        }
-
-
-        recuerdos =
-            data || [];
-
-
-        console.log(
-            "📚 Recuerdos encontrados:",
-            recuerdos.length
-        );
-
-
-        if (!recuerdos.length) {
-
-            gallery.innerHTML = `
-                <div class="loading">
-                    Todavía no hay recuerdos ❤️
-                </div>
-            `;
-
-            return;
-        }
-
-
-        gallery.innerHTML = "";
-
-
-        /*
-         * Por ahora renderizamos uno por uno.
-         * Más adelante vamos a optimizar la carga
-         * para que Drive no tenga que descargar
-         * todos los archivos al mismo tiempo.
-         */
-
-        for (const recuerdo of recuerdos) {
-
-            const tarjeta =
-                await crearTarjeta(
-                    recuerdo
-                );
-
-            gallery.appendChild(
-                tarjeta
-            );
-        }
-
-
-    } catch (error) {
+    if (error) {
 
         console.error(
-            "❌ Error cargando recuerdos:",
+            "Error cargando recuerdos:",
             error
         );
 
 
         gallery.innerHTML = `
-            <div class="loading">
-                No se pudieron cargar los recuerdos.
+            <div class="empty">
+                <div class="empty-icon">
+                    ⚠
+                </div>
+
+                <h2>
+                    No se pudieron cargar
+                </h2>
+
+                <p>
+                    ${escapeHTML(error.message)}
+                </p>
             </div>
         `;
+
+        return;
     }
+
+
+    recuerdos =
+        data || [];
+
+
+    await renderizarRecuerdos();
+
+}
+
+
+/* =========================================
+   RENDER
+========================================= */
+
+async function renderizarRecuerdos() {
+
+    const gallery =
+        document.getElementById(
+            "gallery"
+        );
+
+
+    if (!gallery) {
+        return;
+    }
+
+
+    let lista =
+        [...recuerdos];
+
+
+    if (
+        seccionActual ===
+        "favoritos"
+    ) {
+
+        lista =
+            lista.filter(
+                recuerdo =>
+                    recuerdo.is_favorite === true
+            );
+
+    }
+
+
+    if (
+        seccionActual ===
+        "timeline"
+    ) {
+
+        lista.sort(
+            (a, b) =>
+                new Date(
+                    a.date || 0
+                ) -
+                new Date(
+                    b.date || 0
+                )
+        );
+
+    }
+
+
+    if (lista.length === 0) {
+
+        let mensaje =
+            "Todavía no hay recuerdos.";
+
+        let icono = "♡";
+
+
+        if (
+            seccionActual ===
+            "favoritos"
+        ) {
+
+            mensaje =
+                "Todavía no tenés favoritos.";
+
+            icono = "♡";
+
+        }
+
+
+        gallery.innerHTML = `
+
+            <div class="empty">
+
+                <div class="empty-icon">
+                    ${icono}
+                </div>
+
+                <h2>
+                    ${mensaje}
+                </h2>
+
+                <p>
+                    Los momentos importantes
+                    merecen un lugar.
+                </p>
+
+            </div>
+
+        `;
+
+        return;
+    }
+
+
+    gallery.innerHTML = "";
+
+
+    for (
+        const recuerdo of lista
+    ) {
+
+        const card =
+            await crearTarjeta(
+                recuerdo
+            );
+
+
+        gallery.appendChild(card);
+
+    }
+
 }
 
 
@@ -313,48 +651,32 @@ async function crearTarjeta(
         "memory-card";
 
 
-    /*
-     * Al hacer clic abrimos el visor.
-     */
-
-    card.addEventListener(
-        "click",
-        () => {
-
-            abrirViewer(
-                recuerdo
-            );
-        }
-    );
-
-
-    /* -----------------------------------------
-       MEDIA
-    ----------------------------------------- */
-
     const media =
         document.createElement(
-            "div"
+            "img"
         );
+
 
     media.className =
         "memory-media";
 
 
-    if (recuerdo.drive_file_id) {
-
-        try {
-
-            await asegurarDrive();
+    media.alt =
+        recuerdo.title ||
+        "Recuerdo";
 
 
-            if (!googleAccessToken) {
+    media.loading =
+        "lazy";
 
-                throw new Error(
-                    "Google Drive no está autorizado."
-                );
-            }
 
+    /* URL */
+
+    try {
+
+        if (
+            recuerdo.drive_file_id
+        ) {
 
             const blob =
                 await obtenerArchivoDrive(
@@ -362,130 +684,67 @@ async function crearTarjeta(
                 );
 
 
-            const url =
+            media.src =
                 URL.createObjectURL(
                     blob
                 );
 
-
-            if (
-                recuerdo.media_type ===
-                "video"
-            ) {
-
-                const video =
-                    document.createElement(
-                        "video"
-                    );
-
-                video.src = url;
-
-                video.muted = true;
-
-                video.playsInline = true;
-
-                video.preload = "metadata";
-
-                media.appendChild(
-                    video
-                );
-
-            } else {
-
-                const img =
-                    document.createElement(
-                        "img"
-                    );
-
-                img.src = url;
-
-                img.alt =
-                    recuerdo.title ||
-                    "Recuerdo";
-
-
-                media.appendChild(
-                    img
-                );
-            }
-
-
-        } catch (error) {
-
-            console.error(
-                "❌ Error cargando desde Drive:",
-                error
-            );
-
-
-            media.innerHTML = `
-                <div class="media-error">
-                    ♡
-                </div>
-            `;
         }
 
-
-    } else if (
-        recuerdo.storage_path
-    ) {
-
-        /*
-         * Compatibilidad con los recuerdos
-         * antiguos de Supabase Storage.
-         */
-
-        try {
+        else if (
+            recuerdo.storage_path
+        ) {
 
             const {
                 data,
                 error
-            } = await supabaseClient
-                .storage
-                .from("Recuerdos")
-                .createSignedUrl(
-                    recuerdo.storage_path,
-                    3600
-                );
+            } =
+                await supabaseClient
+                    .storage
+                    .from("Recuerdos")
+                    .createSignedUrl(
+                        recuerdo.storage_path,
+                        3600
+                    );
 
 
             if (
                 !error &&
-                data?.signedUrl
+                data
             ) {
 
-                const img =
-                    document.createElement(
-                        "img"
-                    );
-
-                img.src =
+                media.src =
                     data.signedUrl;
 
-                img.alt =
-                    recuerdo.title ||
-                    "Recuerdo";
-
-
-                media.appendChild(
-                    img
-                );
             }
 
-
-        } catch (error) {
-
-            console.error(
-                "Error cargando Storage:",
-                error
-            );
         }
+
+    } catch (error) {
+
+        console.error(
+            "No se pudo cargar la imagen:",
+            error
+        );
+
+        media.src =
+            crearImagenPlaceholder();
+
     }
 
 
-    /* -----------------------------------------
-       INFORMACIÓN
-    ----------------------------------------- */
+    /* GRADIENT */
+
+    const gradient =
+        document.createElement(
+            "div"
+        );
+
+    gradient.className =
+        "memory-gradient";
+
+
+    /* INFO */
 
     const info =
         document.createElement(
@@ -496,55 +755,134 @@ async function crearTarjeta(
         "memory-info";
 
 
-    const fecha =
+    const title =
         document.createElement(
-            "span"
+            "h3"
         );
 
-    fecha.className =
-        "memory-date";
 
-    fecha.textContent =
+    title.textContent =
+        recuerdo.title ||
+        "Sin título";
+
+
+    const description =
+        document.createElement(
+            "p"
+        );
+
+
+    description.textContent =
+        recuerdo.description ||
         formatearFecha(
             recuerdo.date
         );
 
 
-    const titulo =
-        document.createElement(
-            "h3"
-        );
-
-    titulo.textContent =
-        recuerdo.title ||
-        "Sin título";
-
-
-    const descripcion =
-        document.createElement(
-            "p"
-        );
-
-    descripcion.textContent =
-        recuerdo.description ||
-        "";
-
-
     info.appendChild(
-        fecha
+        title
     );
 
     info.appendChild(
-        titulo
+        description
     );
 
 
-    if (recuerdo.description) {
+    /* FAVORITO */
 
-        info.appendChild(
-            descripcion
+    const favorite =
+        document.createElement(
+            "button"
         );
+
+
+    favorite.type =
+        "button";
+
+
+    favorite.className =
+        "favorite-button";
+
+
+    favorite.innerHTML =
+        recuerdo.is_favorite
+            ? "♥"
+            : "♡";
+
+
+    if (
+        recuerdo.is_favorite
+    ) {
+
+        favorite.classList.add(
+            "active"
+        );
+
     }
+
+
+    favorite.addEventListener(
+        "click",
+        async event => {
+
+            event.stopPropagation();
+
+            await alternarFavorito(
+                recuerdo,
+                favorite
+            );
+
+        }
+    );
+
+
+    /* DELETE */
+
+    const deleteButton =
+        document.createElement(
+            "button"
+        );
+
+
+    deleteButton.type =
+        "button";
+
+
+    deleteButton.className =
+        "delete-button";
+
+
+    deleteButton.textContent =
+        "×";
+
+
+    deleteButton.addEventListener(
+        "click",
+        async event => {
+
+            event.stopPropagation();
+
+            await eliminarRecuerdo(
+                recuerdo
+            );
+
+        }
+    );
+
+
+    /* CLICK CARD */
+
+    card.addEventListener(
+        "click",
+        () => {
+
+            abrirViewer(
+                recuerdo,
+                media.src
+            );
+
+        }
+    );
 
 
     card.appendChild(
@@ -552,7 +890,19 @@ async function crearTarjeta(
     );
 
     card.appendChild(
+        gradient
+    );
+
+    card.appendChild(
         info
+    );
+
+    card.appendChild(
+        favorite
+    );
+
+    card.appendChild(
+        deleteButton
     );
 
 
@@ -561,115 +911,7 @@ async function crearTarjeta(
 
 
 /* =========================================
-   PREPARAR GOOGLE DRIVE
-========================================= */
-
-async function asegurarDrive() {
-
-    if (googleAccessToken) {
-
-        googleDrivePreparado =
-            true;
-
-        return true;
-    }
-
-
-    /*
-     * IMPORTANTE:
-     * No mostramos el selector de Google
-     * automáticamente al cargar la página.
-     *
-     * Primero intentamos conseguir el token
-     * sin mostrar una ventana innecesaria.
-     */
-
-    return new Promise(resolve => {
-
-        if (
-            typeof google ===
-            "undefined" ||
-            !google.accounts
-        ) {
-
-            console.error(
-                "Google Identity Services no está disponible."
-            );
-
-            resolve(false);
-
-            return;
-        }
-
-
-        const client =
-            google.accounts.oauth2
-                .initTokenClient({
-
-                    client_id:
-                        GOOGLE_CLIENT_ID,
-
-                    scope:
-                        GOOGLE_DRIVE_SCOPE,
-
-                    callback:
-                        async response => {
-
-                            if (
-                                response.error
-                            ) {
-
-                                console.error(
-                                    "Google Drive:",
-                                    response
-                                );
-
-                                resolve(false);
-
-                                return;
-                            }
-
-
-                            googleAccessToken =
-                                response.access_token;
-
-
-                            googleDrivePreparado =
-                                true;
-
-
-                            console.log(
-                                "✅ Google Drive autorizado"
-                            );
-
-
-                            try {
-
-                                await obtenerOCrearCarpeta();
-
-                            } catch (error) {
-
-                                console.error(
-                                    "Error preparando carpeta:",
-                                    error
-                                );
-                            }
-
-
-                            resolve(true);
-                        }
-                });
-
-
-        client.requestAccessToken({
-            prompt: ""
-        });
-    });
-}
-
-
-/* =========================================
-   ABRIR MODAL
+   MODAL
 ========================================= */
 
 function abrirModal() {
@@ -688,12 +930,38 @@ function abrirModal() {
     modal.classList.add(
         "active"
     );
+
+
+    modal.setAttribute(
+        "aria-hidden",
+        "false"
+    );
+
+
+    document.body.style.overflow =
+        "hidden";
+
+
+    const fecha =
+        document.getElementById(
+            "fecha"
+        );
+
+
+    if (
+        fecha &&
+        !fecha.value
+    ) {
+
+        fecha.value =
+            new Date()
+                .toISOString()
+                .split("T")[0];
+
+    }
+
 }
 
-
-/* =========================================
-   CERRAR MODAL
-========================================= */
 
 function cerrarModal() {
 
@@ -711,60 +979,130 @@ function cerrarModal() {
     modal.classList.remove(
         "active"
     );
+
+
+    modal.setAttribute(
+        "aria-hidden",
+        "true"
+    );
+
+
+    document.body.style.overflow =
+        "";
+
+
+    archivoSeleccionado =
+        null;
+
+
+    const form =
+        document.getElementById(
+            "memoryForm"
+        );
+
+
+    if (form) {
+
+        form.reset();
+
+    }
+
+
+    const fileName =
+        document.getElementById(
+            "fileName"
+        );
+
+
+    if (fileName) {
+
+        fileName.textContent =
+            "Elegí una foto";
+
+    }
+
 }
 
 
 /* =========================================
-   CERRAR MODAL AL TOCAR FONDO
+   ARCHIVO
 ========================================= */
 
-function cerrarModalFondo(
+function manejarArchivo(
     event
 ) {
 
-    if (
-        event.target.id ===
-        "modal"
-    ) {
+    const file =
+        event.target.files[0];
 
-        cerrarModal();
+
+    archivoSeleccionado =
+        file || null;
+
+
+    const fileName =
+        document.getElementById(
+            "fileName"
+        );
+
+
+    if (!fileName) {
+        return;
     }
+
+
+    if (file) {
+
+        fileName.textContent =
+            file.name;
+
+    } else {
+
+        fileName.textContent =
+            "Elegí una foto";
+
+    }
+
 }
 
 
 /* =========================================
-   GUARDAR RECUERDO
+   GUARDAR
 ========================================= */
 
 async function guardarRecuerdo(
     event
 ) {
 
-    if (event) {
+    event.preventDefault();
 
-        event.preventDefault();
+
+    const file =
+        archivoSeleccionado;
+
+
+    if (!file) {
+
+        mostrarToast(
+            "Elegí una imagen primero."
+        );
+
+        return;
     }
 
 
-    const archivoInput =
-        document.getElementById(
-            "archivo"
+    if (
+        file.size >
+        20 * 1024 * 1024
+    ) {
+
+        mostrarToast(
+            "La imagen supera los 20 MB."
         );
 
-    const tituloInput =
-        document.getElementById(
-            "titulo"
-        );
+        return;
+    }
 
-    const descripcionInput =
-        document.getElementById(
-            "descripcion"
-        );
-
-    const fechaInput =
-        document.getElementById(
-            "fecha"
-        );
 
     const saveButton =
         document.getElementById(
@@ -772,133 +1110,84 @@ async function guardarRecuerdo(
         );
 
 
-    if (
-        !archivoInput ||
-        !archivoInput.files.length
-    ) {
-
-        mostrarToast(
-            "Elegí una foto primero."
+    const saveText =
+        document.getElementById(
+            "saveButtonText"
         );
 
-        return;
-    }
+
+    saveButton.disabled =
+        true;
 
 
-    const archivo =
-        archivoInput.files[0];
-
-
-    const titulo =
-        tituloInput.value.trim();
-
-
-    const descripcion =
-        descripcionInput.value.trim();
-
-
-    const fecha =
-        fechaInput.value ||
-        new Date()
-            .toISOString()
-            .split("T")[0];
+    saveText.textContent =
+        "Conectando con Drive...";
 
 
     try {
 
-        /* -----------------------------------------
-           DESACTIVAR BOTÓN
-        ----------------------------------------- */
-
-        if (saveButton) {
-
-            saveButton.disabled =
-                true;
-
-            saveButton.innerHTML =
-                "Subiendo... <span>☁️</span>";
-        }
-
-
-        mostrarToast(
-            "Conectando con Google Drive..."
-        );
-
-
-        /* -----------------------------------------
-           AUTORIZAR DRIVE
-        ----------------------------------------- */
-
-        const autorizado =
-            await asegurarDrive();
-
-
-        if (!autorizado) {
-
-            throw new Error(
-                "No se pudo autorizar Google Drive."
-            );
-        }
-
-
-        /* -----------------------------------------
-           SUBIR A DRIVE
-        ----------------------------------------- */
-
-        mostrarToast(
-            "Guardando foto en Google Drive..."
-        );
-
+        /* DRIVE */
 
         const archivoDrive =
             await subirArchivoADrive(
-                archivo
+                file
             );
 
 
-        console.log(
-            "☁️ Archivo guardado:",
-            archivoDrive
-        );
+        saveText.textContent =
+            "Guardando recuerdo...";
 
 
-        /* -----------------------------------------
-           SESIÓN SUPABASE
-        ----------------------------------------- */
+        /* DATOS */
+
+        const titulo =
+            document
+                .getElementById(
+                    "titulo"
+                )
+                .value
+                .trim();
+
+
+        const descripcion =
+            document
+                .getElementById(
+                    "descripcion"
+                )
+                .value
+                .trim();
+
+
+        const fecha =
+            document
+                .getElementById(
+                    "fecha"
+                )
+                .value;
+
+
+        /* USUARIO */
 
         const {
-            data: sessionData,
-            error: sessionError
+            data: {
+                user
+            }
         } =
-            await supabaseClient.auth.getSession();
+            await supabaseClient.auth.getUser();
 
 
-        if (
-            sessionError ||
-            !sessionData.session
-        ) {
+        if (!user) {
 
             throw new Error(
-                "La sesión de Supabase no está disponible."
+                "La sesión de usuario no está disponible."
             );
+
         }
 
 
-        const usuario =
-            sessionData.session.user;
-
-
-        /* -----------------------------------------
-           GUARDAR EN MEMORIES
-        ----------------------------------------- */
-
-        mostrarToast(
-            "Registrando recuerdo..."
-        );
-
+        /* INSERT */
 
         const {
-            data,
             error
         } =
             await supabaseClient
@@ -913,20 +1202,15 @@ async function guardarRecuerdo(
                         descripcion,
 
                     date:
-                        fecha,
+                        fecha ||
+                        null,
 
                     media_type:
-                        archivo.type.startsWith(
+                        file.type.startsWith(
                             "video/"
                         )
                             ? "video"
                             : "image",
-
-                    storage_path:
-                        null,
-
-                    created_by:
-                        usuario.id,
 
                     drive_file_id:
                         archivoDrive.id,
@@ -937,19 +1221,18 @@ async function guardarRecuerdo(
                     drive_mime_type:
                         archivoDrive.mimeType,
 
-                    is_favorite:
-                        false
-                })
-                .select()
-                .single();
+                    created_by:
+                        user.id
+
+                });
 
 
         if (error) {
 
             /*
-             * Supabase falló.
-             * Intentamos eliminar el archivo
-             * recién subido a Drive.
+             * Si Supabase falla después de subir
+             * el archivo, eliminamos el archivo
+             * de Drive para no dejar basura.
              */
 
             try {
@@ -958,12 +1241,12 @@ async function guardarRecuerdo(
                     archivoDrive.id
                 );
 
-            } catch (driveError) {
+            } catch (cleanupError) {
 
                 console.error(
-                    "No se pudo eliminar archivo de Drive:",
-                    driveError
+                    cleanupError
                 );
+
             }
 
 
@@ -971,34 +1254,13 @@ async function guardarRecuerdo(
         }
 
 
-        console.log(
-            "✅ Recuerdo creado:",
-            data
+        mostrarToast(
+            "Recuerdo guardado ❤️"
         );
-
-
-        /* -----------------------------------------
-           LIMPIAR
-        ----------------------------------------- */
-
-        document
-            .getElementById(
-                "memoryForm"
-            )
-            .reset();
 
 
         cerrarModal();
 
-
-        mostrarToast(
-            "♡ Recuerdo guardado"
-        );
-
-
-        /* -----------------------------------------
-           RECARGAR GALERÍA
-        ----------------------------------------- */
 
         await cargarRecuerdos();
 
@@ -1006,68 +1268,121 @@ async function guardarRecuerdo(
     } catch (error) {
 
         console.error(
-            "❌ Error guardando recuerdo:",
+            "Error guardando recuerdo:",
             error
         );
 
 
         mostrarToast(
+            error.message ||
             "No se pudo guardar el recuerdo."
         );
 
 
     } finally {
 
-        if (saveButton) {
+        saveButton.disabled =
+            false;
 
-            saveButton.disabled =
-                false;
 
-            saveButton.innerHTML =
-                `
-                Guardar recuerdo
-                <span>♡</span>
-                `;
-        }
+        saveText.textContent =
+            "Guardar recuerdo";
+
     }
+
 }
 
 
 /* =========================================
-   VISOR
+   FAVORITOS
 ========================================= */
 
-async function abrirViewer(
-    recuerdo
+async function alternarFavorito(
+    recuerdo,
+    button
 ) {
 
-    const viewer =
-        document.getElementById(
-            "viewer"
+    const nuevoValor =
+        !recuerdo.is_favorite;
+
+
+    const {
+        error
+    } =
+        await supabaseClient
+            .from("memories")
+            .update({
+
+                is_favorite:
+                    nuevoValor
+
+            })
+            .eq(
+                "id",
+                recuerdo.id
+            );
+
+
+    if (error) {
+
+        console.error(
+            error
         );
 
-    const image =
-        document.getElementById(
-            "viewerImage"
+
+        mostrarToast(
+            "No se pudo actualizar el favorito."
         );
 
-
-    if (!viewer || !image) {
         return;
     }
 
 
-    viewer.classList.add(
-        "active"
+    recuerdo.is_favorite =
+        nuevoValor;
+
+
+    button.innerHTML =
+        nuevoValor
+            ? "♥"
+            : "♡";
+
+
+    button.classList.toggle(
+        "active",
+        nuevoValor
     );
 
 
-    image.style.display =
-        "none";
+    if (
+        seccionActual ===
+        "favoritos"
+    ) {
+
+        await renderizarRecuerdos();
+
+    }
+
+}
 
 
-    image.src =
-        "";
+/* =========================================
+   ELIMINAR
+========================================= */
+
+async function eliminarRecuerdo(
+    recuerdo
+) {
+
+    const confirmar =
+        window.confirm(
+            "¿Querés eliminar este recuerdo?"
+        );
+
+
+    if (!confirmar) {
+        return;
+    }
 
 
     try {
@@ -1076,87 +1391,147 @@ async function abrirViewer(
             recuerdo.drive_file_id
         ) {
 
-            await asegurarDrive();
+            await eliminarArchivoDrive(
+                recuerdo.drive_file_id
+            );
 
-
-            const blob =
-                await obtenerArchivoDrive(
-                    recuerdo.drive_file_id
-                );
-
-
-            const url =
-                URL.createObjectURL(
-                    blob
-                );
-
-
-            image.src =
-                url;
-
-
-            image.style.display =
-                "block";
-
-
-        } else if (
-            recuerdo.storage_path
-        ) {
-
-            const {
-                data,
-                error
-            } =
-                await supabaseClient
-                    .storage
-                    .from("Recuerdos")
-                    .createSignedUrl(
-                        recuerdo.storage_path,
-                        3600
-                    );
-
-
-            if (
-                error ||
-                !data?.signedUrl
-            ) {
-
-                throw new Error(
-                    "No se pudo obtener la imagen."
-                );
-            }
-
-
-            image.src =
-                data.signedUrl;
-
-
-            image.style.display =
-                "block";
         }
+
+
+        const {
+            error
+        } =
+            await supabaseClient
+                .from("memories")
+                .delete()
+                .eq(
+                    "id",
+                    recuerdo.id
+                );
+
+
+        if (error) {
+
+            throw error;
+        }
+
+
+        mostrarToast(
+            "Recuerdo eliminado."
+        );
+
+
+        await cargarRecuerdos();
 
 
     } catch (error) {
 
         console.error(
-            "Error abriendo recuerdo:",
             error
         );
 
 
-        cerrarViewer();
-
-
         mostrarToast(
-            "No se pudo abrir el recuerdo."
+            "No se pudo eliminar."
         );
+
     }
+
 }
 
 
 /* =========================================
-   CERRAR VISOR
+   VIEWER
 ========================================= */
+
+function abrirViewer(
+    recuerdo,
+    imageSrc
+) {
+
+    const viewer =
+        document.getElementById(
+            "viewer"
+        );
+
+
+    const image =
+        document.getElementById(
+            "viewerImage"
+        );
+
+
+    const title =
+        document.getElementById(
+            "viewerTitle"
+        );
+
+
+    const description =
+        document.getElementById(
+            "viewerDescription"
+        );
+
+
+    const date =
+        document.getElementById(
+            "viewerDate"
+        );
+
+
+    if (!viewer || !image) {
+        return;
+    }
+
+
+    image.src =
+        imageSrc;
+
+
+    if (title) {
+
+        title.textContent =
+            recuerdo.title ||
+            "Sin título";
+
+    }
+
+
+    if (description) {
+
+        description.textContent =
+            recuerdo.description ||
+            "";
+
+    }
+
+
+    if (date) {
+
+        date.textContent =
+            formatearFecha(
+                recuerdo.date
+            );
+
+    }
+
+
+    viewer.classList.add(
+        "active"
+    );
+
+
+    viewer.setAttribute(
+        "aria-hidden",
+        "false"
+    );
+
+
+    document.body.style.overflow =
+        "hidden";
+
+}
+
 
 function cerrarViewer() {
 
@@ -1172,75 +1547,229 @@ function cerrarViewer() {
         );
 
 
-    if (viewer) {
-
-        viewer.classList.remove(
-            "active"
-        );
+    if (!viewer) {
+        return;
     }
+
+
+    viewer.classList.remove(
+        "active"
+    );
+
+
+    viewer.setAttribute(
+        "aria-hidden",
+        "true"
+    );
 
 
     if (image) {
 
-        image.src =
-            "";
+        image.src = "";
+
     }
+
+
+    document.body.style.overflow =
+        "";
+
 }
 
 
 /* =========================================
-   CERRAR VISOR AL TOCAR FONDO
+   SECCIONES
 ========================================= */
 
-function cerrarViewerFondo(
-    event
+async function cambiarSeccion(
+    seccion
 ) {
 
-    if (
-        event.target.id ===
-        "viewer"
-    ) {
+    seccionActual =
+        seccion;
 
-        cerrarViewer();
+
+    document
+        .querySelectorAll(
+            ".nav-item"
+        )
+        .forEach(
+            button => {
+
+                button.classList.toggle(
+                    "active",
+                    button.dataset.section ===
+                    seccion
+                );
+
+            }
+        );
+
+
+    const title =
+        document.getElementById(
+            "sectionTitle"
+        );
+
+
+    const description =
+        document.getElementById(
+            "sectionDescription"
+        );
+
+
+    if (seccion === "momentos") {
+
+        title.textContent =
+            "Momentos";
+
+        description.textContent =
+            "Un pequeño lugar para guardar todo lo que no queremos olvidar.";
+
     }
+
+
+    if (seccion === "favoritos") {
+
+        title.textContent =
+            "Favoritos";
+
+        description.textContent =
+            "Los recuerdos que tienen un lugar especial.";
+
+    }
+
+
+    if (seccion === "timeline") {
+
+        title.textContent =
+            "Línea de tiempo";
+
+        description.textContent =
+            "Nuestra historia, momento a momento.";
+
+    }
+
+
+    cerrarMenu();
+
+
+    await renderizarRecuerdos();
+
 }
 
 
 /* =========================================
-   FORMATO FECHA
+   GOOGLE DRIVE
 ========================================= */
 
-function formatearFecha(
-    fecha
-) {
+async function conectarGoogleDrive() {
 
-    if (!fecha) {
-        return "";
+    const button =
+        document.getElementById(
+            "googleDriveButton"
+        );
+
+
+    mostrarEstadoDrive(
+        "Conectando..."
+    );
+
+
+    if (button) {
+
+        button.disabled =
+            true;
+
     }
 
 
     try {
 
-        const fechaObj =
-            new Date(
-                fecha +
-                "T00:00:00"
+        const conectado =
+            await asegurarGoogleDrive();
+
+
+        if (!conectado) {
+
+            throw new Error(
+                "No se pudo conectar Google Drive."
             );
 
+        }
 
-        return fechaObj.toLocaleDateString(
-            "es-AR",
-            {
-                day: "numeric",
-                month: "long",
-                year: "numeric"
-            }
+
+        mostrarEstadoDrive(
+            "✓ Conectado"
         );
 
-    } catch {
 
-        return fecha;
+        mostrarToast(
+            "Google Drive conectado ☁️"
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            error
+        );
+
+
+        mostrarEstadoDrive(
+            "Conectar almacenamiento"
+        );
+
+
+        mostrarToast(
+            error.message ||
+            "No se pudo conectar Google Drive."
+        );
+
+
+    } finally {
+
+        if (button) {
+
+            button.disabled =
+                false;
+
+        }
+
     }
+
+}
+
+
+/* =========================================
+   LOGOUT
+========================================= */
+
+async function cerrarSesion() {
+
+    const {
+        error
+    } =
+        await supabaseClient.auth.signOut();
+
+
+    if (error) {
+
+        console.error(
+            error
+        );
+
+        mostrarToast(
+            "No se pudo cerrar la sesión."
+        );
+
+        return;
+    }
+
+
+    window.location.replace(
+        "./index.html"
+    );
+
 }
 
 
@@ -1273,64 +1802,137 @@ function mostrarToast(
 
 
     clearTimeout(
-        toast._timeout
+        mostrarToast.timeout
     );
 
 
-    toast._timeout =
-        setTimeout(() => {
+    mostrarToast.timeout =
+        setTimeout(
+            () => {
 
-            toast.classList.remove(
-                "show"
-            );
+                toast.classList.remove(
+                    "show"
+                );
 
-        }, 3000);
+            },
+            3000
+        );
+
 }
 
 
 /* =========================================
-   NAVEGACIÓN
+   FECHA
 ========================================= */
 
-document.addEventListener(
-    "click",
-    event => {
+function formatearFecha(
+    fecha
+) {
 
-        const navItem =
-            event.target.closest(
-                ".nav-item"
-            );
+    if (!fecha) {
 
-
-        if (!navItem) {
-            return;
-        }
-
-
-        document
-            .querySelectorAll(
-                ".nav-item"
-            )
-            .forEach(item => {
-
-                item.classList.remove(
-                    "active"
-                );
-            });
-
-
-        navItem.classList.add(
-            "active"
-        );
-
-
-        const section =
-            navItem.dataset.section;
-
-
-        console.log(
-            "Sección seleccionada:",
-            section
-        );
+        return "";
     }
-);
+
+
+    const date =
+        new Date(
+            fecha +
+            "T12:00:00"
+        );
+
+
+    if (
+        Number.isNaN(
+            date.getTime()
+        )
+    ) {
+
+        return fecha;
+    }
+
+
+    return date.toLocaleDateString(
+        "es-AR",
+        {
+            day: "numeric",
+            month: "long",
+            year: "numeric"
+        }
+    );
+
+}
+
+
+/* =========================================
+   PLACEHOLDER
+========================================= */
+
+function crearImagenPlaceholder() {
+
+    const svg = `
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="600"
+            height="600"
+            viewBox="0 0 600 600"
+        >
+            <rect
+                width="600"
+                height="600"
+                fill="#18181c"
+            />
+
+            <text
+                x="300"
+                y="300"
+                text-anchor="middle"
+                dominant-baseline="middle"
+                fill="#777"
+                font-size="70"
+            >
+                ♡
+            </text>
+        </svg>
+    `;
+
+
+    return (
+        "data:image/svg+xml;charset=UTF-8," +
+        encodeURIComponent(svg)
+    );
+
+}
+
+
+/* =========================================
+   SEGURIDAD HTML
+========================================= */
+
+function escapeHTML(
+    texto
+) {
+
+    return String(texto)
+        .replace(
+            /&/g,
+            "&amp;"
+        )
+        .replace(
+            /</g,
+            "&lt;"
+        )
+        .replace(
+            />/g,
+            "&gt;"
+        )
+        .replace(
+            /"/g,
+            "&quot;"
+        )
+        .replace(
+            /'/g,
+            "&#039;"
+        );
+
+}
