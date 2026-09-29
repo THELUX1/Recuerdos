@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Nuestros recuerdos</title>
+    <title>Nuestros recuerdos ❤️</title>
 
     <style>
         * {
@@ -48,6 +49,11 @@
             background: #292929;
             color: white;
             font-size: 16px;
+            outline: none;
+        }
+
+        input:focus {
+            outline: 1px solid #666;
         }
 
         button {
@@ -61,8 +67,14 @@
             cursor: pointer;
         }
 
+        button:disabled {
+            opacity: 0.6;
+            cursor: wait;
+        }
+
         #mensaje {
             margin-top: 15px;
+            min-height: 20px;
             color: #ff8b8b;
         }
     </style>
@@ -74,21 +86,25 @@
 
         <h1>Nuestros recuerdos ❤️</h1>
 
-        <p>Un pequeño lugar para guardar momentos especiales.</p>
+        <p>
+            Un pequeño lugar para guardar momentos especiales.
+        </p>
 
         <input
             type="email"
             id="email"
             placeholder="Correo electrónico"
+            autocomplete="email"
         >
 
         <input
             type="password"
             id="password"
             placeholder="Contraseña"
+            autocomplete="current-password"
         >
 
-        <button onclick="iniciarSesion()">
+        <button id="loginBtn" onclick="iniciarSesion()">
             Entrar
         </button>
 
@@ -96,39 +112,119 @@
 
     </div>
 
+
+    <!-- Biblioteca de Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- Nuestra configuración -->
     <script src="js/supabase.js"></script>
+
 
     <script>
 
         async function iniciarSesion() {
 
-            const email = document.getElementById("email").value;
-            const password = document.getElementById("password").value;
-            const mensaje = document.getElementById("mensaje");
+            const email =
+                document.getElementById("email").value.trim();
 
+            const password =
+                document.getElementById("password").value;
+
+            const mensaje =
+                document.getElementById("mensaje");
+
+            const boton =
+                document.getElementById("loginBtn");
+
+
+            // Limpiar mensaje anterior
             mensaje.textContent = "";
+            mensaje.style.color = "#ff8b8b";
 
-            const { data, error } =
-                await supabaseClient.auth.signInWithPassword({
-                    email: email,
-                    password: password
-                });
 
-            if (error) {
-                mensaje.textContent = "Correo o contraseña incorrectos.";
-                console.error(error);
+            // Comprobar campos
+            if (!email || !password) {
+
+                mensaje.textContent =
+                    "Completá el correo y la contraseña.";
+
                 return;
             }
 
-            mensaje.style.color = "#8cffad";
-mensaje.textContent = "¡Bienvenido!";
 
-setTimeout(() => {
-    window.location.href = "recuerdos.html";
-}, 500);
+            // Desactivar botón mientras inicia sesión
+            boton.disabled = true;
+            boton.textContent = "Ingresando...";
+
+
+            try {
+
+                const { data, error } =
+                    await supabaseClient.auth.signInWithPassword({
+                        email: email,
+                        password: password
+                    });
+
+
+                if (error) {
+
+                    console.error("Error de Supabase:", error);
+
+                    mensaje.textContent =
+                        "Correo o contraseña incorrectos.";
+
+                    boton.disabled = false;
+                    boton.textContent = "Entrar";
+
+                    return;
+                }
+
+
+                // Login correcto
+                mensaje.style.color = "#8cffad";
+                mensaje.textContent = "¡Bienvenido! ❤️";
+
+
+                console.log("Usuario autenticado:", data.user);
+
+
+                // Esperamos un momento para mostrar el mensaje
+                setTimeout(() => {
+
+                    window.location.href = "recuerdos.html";
+
+                }, 500);
+
+
+            } catch (error) {
+
+                console.error("Error inesperado:", error);
+
+                mensaje.textContent =
+                    "Ocurrió un error. Intentá nuevamente.";
+
+                boton.disabled = false;
+                boton.textContent = "Entrar";
+            }
+
+        }
+
+
+        // Permitir presionar ENTER en los campos
+        document
+            .getElementById("password")
+            .addEventListener("keydown", function(event) {
+
+                if (event.key === "Enter") {
+
+                    iniciarSesion();
+
+                }
+
+            });
 
     </script>
 
 </body>
+
 </html>
