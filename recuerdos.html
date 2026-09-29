@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Nuestros recuerdos ❤️</title>
+
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            background: #111;
+            color: white;
+        }
+
+        header {
+            padding: 30px 20px;
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 8px;
+        }
+
+        #usuario {
+            color: #aaa;
+        }
+
+        #estado {
+            text-align: center;
+            margin-top: 50px;
+            color: #aaa;
+        }
+
+        #album {
+            width: min(1100px, 92%);
+            margin: auto;
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 15px;
+            padding-bottom: 40px;
+        }
+
+        .recuerdo {
+            background: #1c1c1c;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+
+        .recuerdo img {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+            display: block;
+        }
+
+        .info {
+            padding: 12px;
+        }
+
+        .info h3 {
+            margin: 0 0 5px;
+        }
+
+        .info p {
+            margin: 0;
+            color: #aaa;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 10px 18px;
+            border: 0;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+
+    <h1>Nuestros recuerdos ❤️</h1>
+
+    <div id="usuario"></div>
+
+    <button onclick="cerrarSesion()">
+        Cerrar sesión
+    </button>
+
+</header>
+
+<div id="estado">
+    Cargando recuerdos...
+</div>
+
+<div id="album"></div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase.js"></script>
+
+<script>
+
+async function comprobarSesion() {
+
+    const { data, error } =
+        await supabaseClient.auth.getSession();
+
+    if (!data.session) {
+
+        window.location.href = "index.html";
+
+        return;
+    }
+
+    document.getElementById("usuario").textContent =
+        data.session.user.email;
+
+    cargarRecuerdos();
+}
+
+
+async function cargarRecuerdos() {
+
+    const estado =
+        document.getElementById("estado");
+
+    const { data, error } =
+        await supabaseClient
+            .from("memories")
+            .select("*")
+            .order("date", { ascending: false });
+
+    if (error) {
+
+        console.error(error);
+
+        estado.textContent =
+            "No pudimos cargar los recuerdos.";
+
+        return;
+    }
+
+    estado.style.display = "none";
+
+    const album =
+        document.getElementById("album");
+
+    if (data.length === 0) {
+
+        estado.style.display = "block";
+
+        estado.textContent =
+            "Todavía no hay recuerdos... 📷";
+
+        return;
+    }
+
+    data.forEach(recuerdo => {
+
+        const elemento =
+            document.createElement("div");
+
+        elemento.className = "recuerdo";
+
+        elemento.innerHTML = `
+
+            <img src="${recuerdo.storage_path}"
+                 alt="${recuerdo.title}">
+
+            <div class="info">
+
+                <h3>${recuerdo.title}</h3>
+
+                <p>${recuerdo.description || ""}</p>
+
+            </div>
+        `;
+
+        album.appendChild(elemento);
+
+    });
+}
+
+
+async function cerrarSesion() {
+
+    await supabaseClient.auth.signOut();
+
+    window.location.href = "index.html";
+}
+
+
+comprobarSesion();
+
+</script>
+
+</body>
+</html>
