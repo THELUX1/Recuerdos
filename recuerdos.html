@@ -2,6 +2,7 @@
 <html lang="es">
 
 <head>
+
     <meta charset="UTF-8">
 
     <meta
@@ -18,22 +19,64 @@
         rel="stylesheet"
         href="css/recuerdos.css"
     >
+
 </head>
+
 
 <body>
 
+    <!-- =====================================
+         BOTÓN MENÚ
+    ====================================== -->
+
+    <button
+    id="menuToggle"
+    class="menu-toggle"
+    onclick="alternarMenu()"
+    aria-label="Abrir menú"
+    aria-expanded="false"
+>
+    <span></span>
+    <span></span>
+    <span></span>
+</button>
+
+<div
+    id="menuOverlay"
+    class="menu-overlay"
+    onclick="cerrarMenu()"
+></div>
+
+
     <div class="app">
+
+
+        <!-- =================================
+             SIDEBAR
+        ================================== -->
 
         <aside class="sidebar">
 
             <div class="logo">
-                <span class="logo-icon">♡</span>
+
+                <span class="logo-icon">
+                    ♡
+                </span>
 
                 <div>
-                    <strong>Nuestros</strong>
-                    <span>recuerdos</span>
+
+                    <strong>
+                        Nuestros
+                    </strong>
+
+                    <span>
+                        recuerdos
+                    </span>
+
                 </div>
+
             </div>
+
 
             <nav class="navigation">
 
@@ -41,27 +84,51 @@
                     class="nav-item active"
                     data-section="momentos"
                 >
-                    <span>⌂</span>
-                    <span>Momentos</span>
+
+                    <span>
+                        ⌂
+                    </span>
+
+                    <span>
+                        Momentos
+                    </span>
+
                 </button>
+
 
                 <button
                     class="nav-item"
                     data-section="favoritos"
                 >
-                    <span>♡</span>
-                    <span>Favoritos</span>
+
+                    <span>
+                        ♡
+                    </span>
+
+                    <span>
+                        Favoritos
+                    </span>
+
                 </button>
+
 
                 <button
                     class="nav-item"
                     data-section="timeline"
                 >
-                    <span>◷</span>
-                    <span>Línea de tiempo</span>
+
+                    <span>
+                        ◷
+                    </span>
+
+                    <span>
+                        Línea de tiempo
+                    </span>
+
                 </button>
 
             </nav>
+
 
             <div class="sidebar-bottom">
 
@@ -73,7 +140,9 @@
 
                     <div class="user-info">
 
-                        <span>Sesión iniciada</span>
+                        <span>
+                            Sesión iniciada
+                        </span>
 
                         <strong id="emailUsuario">
                             Cargando...
@@ -83,13 +152,21 @@
 
                 </div>
 
+
                 <button
                     id="logoutButton"
                     class="logout-button"
                     onclick="cerrarSesion()"
                 >
-                    <span>↪</span>
-                    <span>Cerrar sesión</span>
+
+                    <span>
+                        ↪
+                    </span>
+
+                    <span>
+                        Cerrar sesión
+                    </span>
+
                 </button>
 
             </div>
@@ -97,7 +174,13 @@
         </aside>
 
 
+
+        <!-- =================================
+             CONTENIDO
+        ================================== -->
+
         <main class="main-content">
+
 
             <header class="page-header">
 
@@ -118,16 +201,25 @@
 
                 </div>
 
+
                 <button
                     class="add-memory"
                     onclick="abrirModal()"
                 >
-                    <span>+</span>
+
+                    <span>
+                        +
+                    </span>
+
                     Nuevo recuerdo
+
                 </button>
 
             </header>
 
+
+
+            <!-- GALERÍA -->
 
             <section
                 id="gallery"
@@ -140,12 +232,16 @@
 
             </section>
 
+
         </main>
 
     </div>
 
 
-    <!-- MODAL -->
+
+    <!-- =====================================
+         MODAL NUEVO RECUERDO
+    ====================================== -->
 
     <div
         id="modal"
@@ -155,9 +251,11 @@
 
         <div class="modal-content">
 
+
             <div class="modal-header">
 
                 <div>
+
                     <span class="eyebrow">
                         NUEVO MOMENTO
                     </span>
@@ -165,11 +263,14 @@
                     <h2>
                         Guardar recuerdo
                     </h2>
+
                 </div>
+
 
                 <button
                     class="modal-close"
                     onclick="cerrarModal()"
+                    type="button"
                 >
                     ×
                 </button>
@@ -177,10 +278,14 @@
             </div>
 
 
+
             <form
                 id="memoryForm"
                 onsubmit="guardarRecuerdo(event)"
             >
+
+
+                <!-- FOTO -->
 
                 <div class="upload-area">
 
@@ -196,6 +301,7 @@
                         JPG, PNG, WEBP · Máximo 20 MB
                     </span>
 
+
                     <input
                         id="archivo"
                         type="file"
@@ -205,6 +311,9 @@
 
                 </div>
 
+
+
+                <!-- TÍTULO -->
 
                 <div class="form-field">
 
@@ -222,6 +331,9 @@
                 </div>
 
 
+
+                <!-- DESCRIPCIÓN -->
+
                 <div class="form-field">
 
                     <label for="descripcion">
@@ -237,6 +349,9 @@
                 </div>
 
 
+
+                <!-- FECHA -->
+
                 <div class="form-field">
 
                     <label for="fecha">
@@ -251,14 +366,21 @@
                 </div>
 
 
+
                 <button
                     id="saveButton"
                     class="save-memory"
                     type="submit"
                 >
+
                     Guardar recuerdo
-                    <span>♡</span>
+
+                    <span>
+                        ♡
+                    </span>
+
                 </button>
+
 
             </form>
 
@@ -267,7 +389,10 @@
     </div>
 
 
-    <!-- VISOR -->
+
+    <!-- =====================================
+         VISOR DE FOTOS
+    ====================================== -->
 
     <div
         id="viewer"
@@ -278,9 +403,11 @@
         <button
             class="viewer-close"
             onclick="cerrarViewer()"
+            type="button"
         >
             ×
         </button>
+
 
         <img
             id="viewerImage"
@@ -291,11 +418,17 @@
     </div>
 
 
+
+    <!-- TOAST -->
+
     <div
         id="toast"
         class="toast"
     ></div>
 
+
+
+    <!-- JAVASCRIPT -->
 
     <script src="js/recuerdos.js"></script>
 
