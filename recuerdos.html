@@ -13,7 +13,12 @@
     <title>Nuestros recuerdos ❤️</title>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="js/supabase.js"></script>
+
+<script src="https://accounts.google.com/gsi/client"></script>
+
+<script src="js/supabase.js"></script>
+<script src="js/google-drive.js"></script>
+<script src="js/recuerdos.js"></script>
 
     <link
         rel="stylesheet"
@@ -24,7 +29,21 @@
 
 
 <body>
-
+<button
+    onclick="iniciarGoogleDrive()"
+    style="
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 99999;
+        padding: 14px 18px;
+        border-radius: 12px;
+        border: none;
+        cursor: pointer;
+    "
+>
+    🔐 Probar Google Drive
+</button>
     <!-- =====================================
          BOTÓN MENÚ
     ====================================== -->
