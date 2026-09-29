@@ -1,5 +1,7 @@
 let usuarioActual = null;
 
+let toastTimeout = null;
+
 
 /* =========================================
    SESIÓN
@@ -22,17 +24,26 @@ async function comprobarSesion() {
                 error
             );
 
-            window.location.replace("./index.html");
+            window.location.replace(
+                "./index.html"
+            );
 
             return;
+
         }
 
 
-        if (!data || !data.session) {
+        if (
+            !data ||
+            !data.session
+        ) {
 
-            window.location.replace("./index.html");
+            window.location.replace(
+                "./index.html"
+            );
 
             return;
+
         }
 
 
@@ -64,7 +75,94 @@ async function comprobarSesion() {
             error
         );
 
-        window.location.replace("./index.html");
+        window.location.replace(
+            "./index.html"
+        );
+
+    }
+
+}
+
+
+/* =========================================
+   MENÚ
+========================================= */
+
+function alternarMenu() {
+
+    const abierto =
+        document.body.classList.contains(
+            "menu-open"
+        );
+
+
+    if (abierto) {
+
+        cerrarMenu();
+
+    } else {
+
+        abrirMenu();
+
+    }
+
+}
+
+
+function abrirMenu() {
+
+    document.body.classList.add(
+        "menu-open"
+    );
+
+
+    const boton =
+        document.getElementById(
+            "menuToggle"
+        );
+
+
+    if (boton) {
+
+        boton.setAttribute(
+            "aria-expanded",
+            "true"
+        );
+
+        boton.setAttribute(
+            "aria-label",
+            "Cerrar menú"
+        );
+
+    }
+
+}
+
+
+function cerrarMenu() {
+
+    document.body.classList.remove(
+        "menu-open"
+    );
+
+
+    const boton =
+        document.getElementById(
+            "menuToggle"
+        );
+
+
+    if (boton) {
+
+        boton.setAttribute(
+            "aria-expanded",
+            "false"
+        );
+
+        boton.setAttribute(
+            "aria-label",
+            "Abrir menú"
+        );
 
     }
 
@@ -88,8 +186,12 @@ async function cerrarSesion() {
         boton.disabled = true;
 
         boton.innerHTML =
-            "<span>↪</span>" +
-            "<span>Cerrando sesión...</span>";
+            `
+                <span>↪</span>
+                <span>
+                    Cerrando sesión...
+                </span>
+            `;
 
     }
 
@@ -147,14 +249,20 @@ async function cargarRecuerdos() {
 
 
     if (!gallery) {
+
         return;
+
     }
 
 
     gallery.innerHTML = `
+
         <div class="loading">
+
             Cargando recuerdos...
+
         </div>
+
     `;
 
 
@@ -193,9 +301,16 @@ async function cargarRecuerdos() {
         ) {
 
             gallery.innerHTML = `
+
                 <div class="empty">
 
-                    <div>
+                    <div
+                        style="
+                            font-size:42px;
+                            margin-bottom:15px;
+                            opacity:.5;
+                        "
+                    >
                         ♡
                     </div>
 
@@ -203,17 +318,21 @@ async function cargarRecuerdos() {
                         Todavía no hay recuerdos.
                     </div>
 
-                    <small style="
-                        margin-top:7px;
-                        color:#55555e;
-                    ">
+                    <small
+                        style="
+                            margin-top:7px;
+                            color:#55555e;
+                        "
+                    >
                         Guardá el primero.
                     </small>
 
                 </div>
+
             `;
 
             return;
+
         }
 
 
@@ -271,7 +390,12 @@ async function cargarRecuerdos() {
 
             <div class="empty">
 
-                <div>
+                <div
+                    style="
+                        font-size:40px;
+                        margin-bottom:15px;
+                    "
+                >
                     ⚠
                 </div>
 
@@ -300,10 +424,13 @@ function crearTarjeta(
 ) {
 
     const card =
-        document.createElement("article");
+        document.createElement(
+            "article"
+        );
 
 
-    card.className = "card";
+    card.className =
+        "card";
 
 
     const titulo =
@@ -384,7 +511,9 @@ function crearTarjeta(
     );
 
 
-    gallery.appendChild(card);
+    gallery.appendChild(
+        card
+    );
 
 }
 
@@ -446,7 +575,7 @@ async function guardarRecuerdo(
     }
 
 
-    /* VALIDAR TIPO */
+    /* VALIDAR IMAGEN */
 
     if (
         !archivo.type.startsWith(
@@ -463,7 +592,7 @@ async function guardarRecuerdo(
     }
 
 
-    /* VALIDAR TAMAÑO */
+    /* MÁXIMO 20 MB */
 
     const maxSize =
         20 * 1024 * 1024;
@@ -513,7 +642,7 @@ async function guardarRecuerdo(
             "-" +
             Math.random()
                 .toString(36)
-                .substring(2, 10) +
+                .substring(2,10) +
             "." +
             extension;
 
@@ -547,8 +676,12 @@ async function guardarRecuerdo(
                     rutaArchivo,
                     archivo,
                     {
-                        cacheControl: "3600",
-                        upsert: false,
+                        cacheControl:
+                            "3600",
+
+                        upsert:
+                            false,
+
                         contentType:
                             archivo.type
                     }
@@ -632,7 +765,7 @@ async function guardarRecuerdo(
             );
 
 
-            /* BORRAR ARCHIVO SI DB FALLA */
+            /* BORRAR FOTO SI FALLA DATABASE */
 
             await supabaseClient
                 .storage
@@ -647,13 +780,19 @@ async function guardarRecuerdo(
         }
 
 
-        /* =================================
-           LIMPIAR FORMULARIO
-        ================================= */
+        /* LIMPIAR FORMULARIO */
 
-        document.getElementById(
-            "memoryForm"
-        ).reset();
+        const form =
+            document.getElementById(
+                "memoryForm"
+            );
+
+
+        if (form) {
+
+            form.reset();
+
+        }
 
 
         cerrarModal();
@@ -694,7 +833,10 @@ async function guardarRecuerdo(
         boton.disabled = false;
 
         boton.innerHTML =
-            "Guardar recuerdo <span>♡</span>";
+            `
+                Guardar recuerdo
+                <span>♡</span>
+            `;
 
     }
 
@@ -713,9 +855,13 @@ function abrirModal() {
         );
 
 
-    modal.classList.add(
-        "show"
-    );
+    if (modal) {
+
+        modal.classList.add(
+            "show"
+        );
+
+    }
 
 }
 
@@ -728,9 +874,13 @@ function cerrarModal() {
         );
 
 
-    modal.classList.remove(
-        "show"
-    );
+    if (modal) {
+
+        modal.classList.remove(
+            "show"
+        );
+
+    }
 
 }
 
@@ -771,7 +921,15 @@ function abrirViewer(
         );
 
 
-    image.src = url;
+    if (!viewer || !image) {
+
+        return;
+
+    }
+
+
+    image.src =
+        url;
 
 
     viewer.classList.add(
@@ -795,12 +953,20 @@ function cerrarViewer() {
         );
 
 
-    viewer.classList.remove(
-        "show"
-    );
+    if (viewer) {
+
+        viewer.classList.remove(
+            "show"
+        );
+
+    }
 
 
-    image.src = "";
+    if (image) {
+
+        image.src = "";
+
+    }
 
 }
 
@@ -825,9 +991,6 @@ function cerrarViewerFondo(
    TOAST
 ========================================= */
 
-let toastTimeout;
-
-
 function mostrarToast(
     mensaje
 ) {
@@ -836,6 +999,13 @@ function mostrarToast(
         document.getElementById(
             "toast"
         );
+
+
+    if (!toast) {
+
+        return;
+
+    }
 
 
     toast.textContent =
@@ -917,22 +1087,27 @@ function escaparHTML(
 ) {
 
     return String(texto)
+
         .replace(
             /&/g,
             "&amp;"
         )
+
         .replace(
             /</g,
             "&lt;"
         )
+
         .replace(
             />/g,
             "&gt;"
         )
+
         .replace(
             /"/g,
             "&quot;"
         )
+
         .replace(
             /'/g,
             "&#039;"
@@ -942,7 +1117,7 @@ function escaparHTML(
 
 
 /* =========================================
-   CERRAR CON ESCAPE
+   TECLA ESC
 ========================================= */
 
 document.addEventListener(
@@ -956,6 +1131,8 @@ document.addEventListener(
             cerrarModal();
 
             cerrarViewer();
+
+            cerrarMenu();
 
         }
 
