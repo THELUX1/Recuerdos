@@ -1,464 +1,311 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Nuestros recuerdos ❤️</title>
+<title>Nuestros recuerdos ❤️</title>
 
-    <style>
+<style>
 
-        * {
-            box-sizing: border-box;
-        }
+    * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
 
-        body {
-            margin: 0;
-            min-height: 100vh;
-            font-family: Arial, sans-serif;
-            background: #111;
-            color: white;
-        }
+    body {
+        min-height: 100vh;
 
-        header {
-            padding: 35px 20px 25px;
-            text-align: center;
-        }
+        display: flex;
+        align-items: center;
+        justify-content: center;
 
-        h1 {
-            margin: 0 0 8px;
-            font-size: 30px;
-        }
+        padding: 20px;
 
-        #usuario {
-            color: #999;
-            font-size: 14px;
-        }
+        font-family: Arial, Helvetica, sans-serif;
 
-        .acciones {
-            width: min(1100px, 92%);
-            margin: 0 auto 25px;
-            display: flex;
-            justify-content: center;
-        }
+        background: #0e0e10;
+        color: #f4f4f5;
+    }
 
-        .btn-agregar {
-            padding: 13px 22px;
-            border: none;
-            border-radius: 12px;
-            background: white;
-            color: #111;
-            font-size: 15px;
-            font-weight: bold;
-            cursor: pointer;
-        }
+    .login {
+        width: 100%;
+        max-width: 390px;
 
-        .btn-agregar:hover {
-            opacity: 0.9;
-        }
+        padding: 30px;
 
-        .btn-salir {
-            margin-top: 18px;
-            padding: 9px 16px;
-            border: none;
-            border-radius: 9px;
-            background: #292929;
-            color: white;
-            cursor: pointer;
-        }
+        background: #17171a;
 
-        #estado {
-            text-align: center;
-            margin: 45px 20px;
-            color: #888;
-        }
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 22px;
 
-        #album {
-            width: min(1100px, 92%);
-            margin: auto;
-            display: grid;
-            grid-template-columns: repeat(
-                auto-fill,
-                minmax(220px, 1fr)
-            );
-            gap: 15px;
-            padding-bottom: 50px;
-        }
+        text-align: center;
 
-        .recuerdo {
-            background: #1c1c1c;
-            border-radius: 15px;
-            overflow: hidden;
-        }
+        box-shadow:
+            0 20px 60px rgba(0,0,0,.35);
+    }
 
-        .recuerdo img {
-            width: 100%;
-            aspect-ratio: 1;
-            object-fit: cover;
-            display: block;
-        }
+    h1 {
+        font-size: 27px;
+        margin-bottom: 10px;
+    }
 
-        .info {
-            padding: 13px;
-        }
+    .subtitle {
+        color: #929298;
+        font-size: 14px;
+        line-height: 1.5;
 
-        .info h3 {
-            margin: 0 0 5px;
-        }
+        margin-bottom: 25px;
+    }
 
-        .info p {
-            margin: 0;
-            color: #999;
-            font-size: 14px;
-        }
+    input {
+        width: 100%;
 
-        /* =========================
-           MODAL
-        ========================= */
+        padding: 14px;
 
-        .modal {
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.75);
+        margin-bottom: 12px;
 
-            display: none;
-            justify-content: center;
-            align-items: center;
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 12px;
 
-            padding: 20px;
-            z-index: 100;
-        }
+        background: #101012;
+        color: #f4f4f5;
 
-        .modal.activo {
-            display: flex;
-        }
+        outline: none;
+    }
 
-        .modal-contenido {
-            width: min(100%, 430px);
-            background: #1c1c1c;
-            border-radius: 20px;
-            padding: 25px;
-        }
+    input:focus {
+        border-color: rgba(255,255,255,.25);
+    }
 
-        .modal-contenido h2 {
-            margin-top: 0;
-            text-align: center;
-        }
+    button {
+        width: 100%;
 
-        .campo {
-            margin-bottom: 15px;
-        }
+        padding: 14px;
 
-        .campo label {
-            display: block;
-            margin-bottom: 7px;
-            color: #ccc;
-            font-size: 14px;
-        }
+        margin-top: 5px;
 
-        .campo input,
-        .campo textarea {
-            width: 100%;
-            padding: 12px;
-            border: none;
-            border-radius: 10px;
-            background: #292929;
-            color: white;
-            font-size: 15px;
-            font-family: inherit;
-        }
+        border: none;
+        border-radius: 12px;
 
-        .campo textarea {
-            resize: vertical;
-            min-height: 90px;
-        }
+        background: white;
+        color: #111;
 
-        .botones-modal {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-        }
+        font-weight: 600;
 
-        .botones-modal button {
-            flex: 1;
-            padding: 13px;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-        }
+        cursor: pointer;
+    }
 
-        .btn-cancelar {
-            background: #292929;
-            color: white;
-        }
+    button:disabled {
+        opacity: .5;
+        cursor: wait;
+    }
 
-        .btn-guardar {
-            background: white;
-            color: #111;
-            font-weight: bold;
-        }
+    #mensaje {
+        min-height: 20px;
 
-        #foto {
-            background: transparent;
-            padding: 0;
-        }
+        margin-top: 15px;
 
-    </style>
+        font-size: 14px;
+    }
 
+</style>
 </head>
 
 <body>
 
-    <header>
+<div class="login">
 
-        <h1>Nuestros recuerdos ❤️</h1>
+    <h1>Nuestros recuerdos ❤️</h1>
 
-        <div id="usuario"></div>
+    <p class="subtitle">
+        Un pequeño lugar para guardar momentos especiales.
+    </p>
 
-        <button
-            class="btn-salir"
-            onclick="cerrarSesion()">
-            Cerrar sesión
-        </button>
 
-    </header>
+    <input
+        type="email"
+        id="email"
+        placeholder="Correo electrónico"
+        autocomplete="email"
+    >
 
 
-    <div class="acciones">
+    <input
+        type="password"
+        id="password"
+        placeholder="Contraseña"
+        autocomplete="current-password"
+    >
 
-        <button
-            class="btn-agregar"
-            onclick="abrirModal()">
 
-            ＋ Agregar recuerdo
+    <button
+        id="loginBtn"
+        onclick="iniciarSesion()">
 
-        </button>
+        Entrar
 
-    </div>
+    </button>
 
 
-    <div id="estado">
-        Todavía no hay recuerdos... 📷
-    </div>
+    <div id="mensaje"></div>
 
+</div>
 
-    <div id="album"></div>
 
+<!-- SUPABASE -->
 
-    <!-- =========================
-         MODAL AGREGAR RECUERDO
-    ========================== -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/supabase.js"></script>
 
-    <div
-        id="modal"
-        class="modal">
 
-        <div class="modal-contenido">
+<script>
 
-            <h2>Nuevo recuerdo 📸</h2>
+async function iniciarSesion() {
 
+    const email =
+        document.getElementById("email").value.trim();
 
-            <div class="campo">
+    const password =
+        document.getElementById("password").value;
 
-                <label for="foto">
-                    Foto
-                </label>
+    const mensaje =
+        document.getElementById("mensaje");
 
-                <input
-                    type="file"
-                    id="foto"
-                    accept="image/*">
+    const boton =
+        document.getElementById("loginBtn");
 
-            </div>
 
+    mensaje.textContent = "";
+    mensaje.style.color = "#ff8b8b";
 
-            <div class="campo">
 
-                <label for="titulo">
-                    Título
-                </label>
+    if (!email || !password) {
 
-                <input
-                    type="text"
-                    id="titulo"
-                    placeholder="Por ejemplo: Nuestro primer paseo">
+        mensaje.textContent =
+            "Completá el correo y la contraseña.";
 
-            </div>
+        return;
+    }
 
 
-            <div class="campo">
+    boton.disabled = true;
+    boton.textContent = "Ingresando...";
 
-                <label for="descripcion">
-                    Descripción
-                </label>
 
-                <textarea
-                    id="descripcion"
-                    placeholder="Escribí algo sobre este recuerdo..."></textarea>
+    try {
 
-            </div>
+        console.log("Intentando iniciar sesión...");
 
 
-            <div class="campo">
+        const {
+            data,
+            error
+        } = await supabaseClient.auth.signInWithPassword({
 
-                <label for="fecha">
-                    Fecha
-                </label>
+            email: email,
 
-                <input
-                    type="date"
-                    id="fecha">
+            password: password
 
-            </div>
+        });
 
 
-            <div class="botones-modal">
+        if (error) {
 
-                <button
-                    class="btn-cancelar"
-                    onclick="cerrarModal()">
-
-                    Cancelar
-
-                </button>
-
-                <button
-                    class="btn-guardar"
-                    onclick="guardarRecuerdo()">
-
-                    Guardar recuerdo
-
-                </button>
-
-            </div>
-
-        </div>
-
-    </div>
-
-
-    <!-- Supabase -->
-
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-    <script src="js/supabase.js"></script>
-
-
-    <script>
-
-        async function comprobarSesion() {
-
-            const { data, error } =
-                await supabaseClient.auth.getSession();
-
-
-            if (!data.session) {
-
-                window.location.href =
-                    "index.html";
-
-                return;
-
-            }
-
-
-            document.getElementById("usuario").textContent =
-                data.session.user.email;
-
-
-            cargarRecuerdos();
-
-        }
-
-
-        async function cargarRecuerdos() {
-
-            const estado =
-                document.getElementById("estado");
-
-
-            const { data, error } =
-                await supabaseClient
-                    .from("memories")
-                    .select("*")
-                    .order("date", {
-                        ascending: false
-                    });
-
-
-            if (error) {
-
-                console.error(error);
-
-                estado.textContent =
-                    "No pudimos cargar los recuerdos.";
-
-                return;
-
-            }
-
-
-            if (!data || data.length === 0) {
-
-                estado.style.display =
-                    "block";
-
-                estado.textContent =
-                    "Todavía no hay recuerdos... 📷";
-
-                return;
-
-            }
-
-
-            estado.style.display =
-                "none";
-
-        }
-
-
-        function abrirModal() {
-
-            document
-                .getElementById("modal")
-                .classList.add("activo");
-
-        }
-
-
-        function cerrarModal() {
-
-            document
-                .getElementById("modal")
-                .classList.remove("activo");
-
-        }
-
-
-        async function guardarRecuerdo() {
-
-            alert(
-                "La subida de fotos la conectaremos en el próximo paso 📸"
+            console.error(
+                "Error de Supabase:",
+                error
             );
 
+            mensaje.textContent =
+                "Correo o contraseña incorrectos.";
+
+            boton.disabled = false;
+            boton.textContent = "Entrar";
+
+            return;
         }
 
 
-        async function cerrarSesion() {
+        if (!data || !data.session) {
 
-            await supabaseClient.auth.signOut();
+            console.error(
+                "Supabase no devolvió una sesión."
+            );
 
-            window.location.href =
-                "index.html";
+            mensaje.textContent =
+                "No se pudo iniciar la sesión.";
 
+            boton.disabled = false;
+            boton.textContent = "Entrar";
+
+            return;
         }
 
 
-        comprobarSesion();
+        console.log(
+            "Inicio de sesión correcto:",
+            data.user
+        );
 
-    </script>
+
+        mensaje.style.color = "#8cffad";
+
+        mensaje.textContent =
+            "¡Bienvenido! ❤️";
+
+
+        /*
+         * Reemplazamos la página actual.
+         * No usamos un temporizador para evitar
+         * que otra lógica interfiera.
+         */
+
+        window.location.replace(
+            "./recuerdos.html"
+        );
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Error inesperado:",
+            error
+        );
+
+        mensaje.textContent =
+            "Ocurrió un error. Intentá nuevamente.";
+
+        boton.disabled = false;
+        boton.textContent = "Entrar";
+
+    }
+
+}
+
+
+/*
+ * Permitir Enter para iniciar sesión.
+ */
+
+document
+    .getElementById("password")
+    .addEventListener(
+        "keydown",
+        function(event) {
+
+            if (event.key === "Enter") {
+
+                iniciarSesion();
+
+            }
+
+        }
+    );
+
+</script>
 
 </body>
-
 </html>
