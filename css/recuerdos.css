@@ -627,7 +627,7 @@ body.menu-open
     min-height: 100vh;
 
     padding:
-        100px
+        72px
         clamp(25px, 5vw, 80px)
         80px;
 
@@ -1641,7 +1641,7 @@ body.menu-open
         width: 100%;
 
         padding:
-            90px
+            70px
             18px
             60px;
 
@@ -1795,4 +1795,36 @@ body.menu-open
 
     }
 
+}
+/* =========================================
+   CONTROL DEL MENÚ
+========================================= */
+
+.menu-toggle {
+    display: flex !important;
+
+    position: fixed !important;
+
+    top: 18px !important;
+    left: 18px !important;
+
+    width: 46px !important;
+    height: 46px !important;
+
+    z-index: 9999 !important;
+}
+
+
+.menu-overlay {
+    z-index: 9997 !important;
+}
+
+
+.sidebar {
+    z-index: 9998 !important;
+}
+
+
+body.menu-open .sidebar {
+    transform: translateX(0) !important;
 }
