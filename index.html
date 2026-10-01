@@ -1,311 +1,96 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>Nuestros recuerdos ❤️</title>
-
-<style>
-
-    * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-    }
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lo que siento</title>
+  <style>
+    * { box-sizing: border-box; }
     body {
-        min-height: 100vh;
-
-        display: flex;
-        align-items: center;
-        justify-content: center;
-
-        padding: 20px;
-
-        font-family: Arial, Helvetica, sans-serif;
-
-        background: #0e0e10;
-        color: #f4f4f5;
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 32px 16px;
+      background: #f3eee8;
+      color: #302b29;
+      font-family: Georgia, "Times New Roman", serif;
     }
 
-    .login {
-        width: 100%;
-        max-width: 390px;
+    .carta {
+      width: min(720px, 100%);
+      background: #fffdf9;
+      padding: clamp(32px, 7vw, 68px);
+      box-shadow: 0 18px 50px rgba(54, 42, 34, 0.12);
+      border-radius: 3px;
+      position: relative;
+    }
 
-        padding: 30px;
-
-        background: #17171a;
-
-        border: 1px solid rgba(255,255,255,.08);
-        border-radius: 22px;
-
-        text-align: center;
-
-        box-shadow:
-            0 20px 60px rgba(0,0,0,.35);
+    .carta::before {
+      content: "";
+      display: block;
+      width: 46px;
+      height: 2px;
+      background: #8f8178;
+      margin-bottom: 28px;
     }
 
     h1 {
-        font-size: 27px;
-        margin-bottom: 10px;
+      margin: 0 0 34px;
+      font-size: clamp(30px, 6vw, 46px);
+      font-weight: normal;
+      letter-spacing: -0.5px;
     }
 
-    .subtitle {
-        color: #929298;
-        font-size: 14px;
-        line-height: 1.5;
-
-        margin-bottom: 25px;
+    p {
+      margin: 0 0 22px;
+      font-size: 18px;
+      line-height: 1.85;
     }
 
-    input {
-        width: 100%;
-
-        padding: 14px;
-
-        margin-bottom: 12px;
-
-        border: 1px solid rgba(255,255,255,.08);
-        border-radius: 12px;
-
-        background: #101012;
-        color: #f4f4f5;
-
-        outline: none;
+    .pregunta {
+      font-style: italic;
+      margin-top: 30px;
     }
 
-    input:focus {
-        border-color: rgba(255,255,255,.25);
+    .final {
+      margin-top: 34px;
+      font-style: italic;
     }
 
-    button {
-        width: 100%;
-
-        padding: 14px;
-
-        margin-top: 5px;
-
-        border: none;
-        border-radius: 12px;
-
-        background: white;
-        color: #111;
-
-        font-weight: 600;
-
-        cursor: pointer;
+    @media (max-width: 520px) {
+      body { padding: 18px 10px; }
+      .carta { padding: 30px 25px; }
+      p { font-size: 17px; line-height: 1.75; }
     }
-
-    button:disabled {
-        opacity: .5;
-        cursor: wait;
-    }
-
-    #mensaje {
-        min-height: 20px;
-
-        margin-top: 15px;
-
-        font-size: 14px;
-    }
-
-</style>
+  </style>
 </head>
-
 <body>
+  <main class="carta">
+    <h1>Lo que siento</h1>
 
-<div class="login">
+    <p>¿Cuál es el punto de intentar conocer a alguien más si yo solo te quiero a vos? ¿No estaría engañando a esa persona y, al mismo tiempo, engañándome a mí mismo?</p>
 
-    <h1>Nuestros recuerdos ❤️</h1>
+    <p>Ahora ya no solo casi no me escribís; directamente, a veces, ni siquiera me clavás el visto. Ya no me mandás Reels. Ya no están esas ganas que antes tenías de hablarme sobre tu día, de contarme cómo te sentías, para que yo pudiera escucharte, acompañarte y tratar de motivarte.</p>
 
-    <p class="subtitle">
-        Un pequeño lugar para guardar momentos especiales.
-    </p>
+    <p>Y es gracioso, ¿no? Recuerdo que, cuando estábamos caminando y hablando, te dije que algún día ibas a conocer a alguien y que nosotros ya no íbamos a estar como antes y me dijiste que eso no iba a pasar. Al final pasó, tenía razón.</p>
 
+    <p class="pregunta">Lo que no entiendo es por qué.</p>
 
-    <input
-        type="email"
-        id="email"
-        placeholder="Correo electrónico"
-        autocomplete="email"
-    >
+    <p>¿Por qué decirme que me querés? ¿Por qué decirme que tenías ganas de verme y salir conmigo? ¿Por qué contarme que a veces tenías ganas de invitarme, pero te daba vergüenza? ¿Por qué decírmelo a mí y no al chico que tanto te gusta?</p>
 
+    <p>Todo eso no me deja dormir.</p>
 
-    <input
-        type="password"
-        id="password"
-        placeholder="Contraseña"
-        autocomplete="current-password"
-    >
+    <p>Me quedo preguntándome por qué, si tan bien nos llevábamos y si yo te hacía sentir tan bien, de repente apareció alguien que ni siquiera sabe cosas de vos que yo sí conozco, alguien que no estuvo ahí para escucharte, acompañarte y conocer cada una de esas pequeñas cosas que fui descubriendo de vos… y aun así logró hacerte sentir algo que yo no pude.</p>
 
+    <p>Supongo que, al final, no siempre gana el más gracioso, ni el que más se esfuerza, ni el que intenta hacer las cosas medianamente bien.</p>
 
-    <button
-        id="loginBtn"
-        onclick="iniciarSesion()">
+    <p>Y quizás eso es lo que más me duele: darme cuenta de que podés conocer profundamente a alguien, quererla con todo lo que tenés y aun así no ser la persona que elige.</p>
 
-        Entrar
+    <p>Supongo que quizá solo necesitabas a alguien con quien distraerte, alguien a quien contarle todo aquello que no podías contarle a otro.</p>
 
-    </button>
-
-
-    <div id="mensaje"></div>
-
-</div>
-
-
-<!-- SUPABASE -->
-
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="js/supabase.js"></script>
-
-
-<script>
-
-async function iniciarSesion() {
-
-    const email =
-        document.getElementById("email").value.trim();
-
-    const password =
-        document.getElementById("password").value;
-
-    const mensaje =
-        document.getElementById("mensaje");
-
-    const boton =
-        document.getElementById("loginBtn");
-
-
-    mensaje.textContent = "";
-    mensaje.style.color = "#ff8b8b";
-
-
-    if (!email || !password) {
-
-        mensaje.textContent =
-            "Completá el correo y la contraseña.";
-
-        return;
-    }
-
-
-    boton.disabled = true;
-    boton.textContent = "Ingresando...";
-
-
-    try {
-
-        console.log("Intentando iniciar sesión...");
-
-
-        const {
-            data,
-            error
-        } = await supabaseClient.auth.signInWithPassword({
-
-            email: email,
-
-            password: password
-
-        });
-
-
-        if (error) {
-
-            console.error(
-                "Error de Supabase:",
-                error
-            );
-
-            mensaje.textContent =
-                "Correo o contraseña incorrectos.";
-
-            boton.disabled = false;
-            boton.textContent = "Entrar";
-
-            return;
-        }
-
-
-        if (!data || !data.session) {
-
-            console.error(
-                "Supabase no devolvió una sesión."
-            );
-
-            mensaje.textContent =
-                "No se pudo iniciar la sesión.";
-
-            boton.disabled = false;
-            boton.textContent = "Entrar";
-
-            return;
-        }
-
-
-        console.log(
-            "Inicio de sesión correcto:",
-            data.user
-        );
-
-
-        mensaje.style.color = "#8cffad";
-
-        mensaje.textContent =
-            "¡Bienvenido! ❤️";
-
-
-        /*
-         * Reemplazamos la página actual.
-         * No usamos un temporizador para evitar
-         * que otra lógica interfiera.
-         */
-
-        window.location.replace(
-            "./recuerdos.html"
-        );
-
-    }
-
-    catch (error) {
-
-        console.error(
-            "Error inesperado:",
-            error
-        );
-
-        mensaje.textContent =
-            "Ocurrió un error. Intentá nuevamente.";
-
-        boton.disabled = false;
-        boton.textContent = "Entrar";
-
-    }
-
-}
-
-
-/*
- * Permitir Enter para iniciar sesión.
- */
-
-document
-    .getElementById("password")
-    .addEventListener(
-        "keydown",
-        function(event) {
-
-            if (event.key === "Enter") {
-
-                iniciarSesion();
-
-            }
-
-        }
-    );
-
-</script>
-
+    <p class="final">Y yo, sin darme cuenta, terminé queriéndote mucho más de lo que imaginé.</p>
+  </main>
 </body>
 </html>
