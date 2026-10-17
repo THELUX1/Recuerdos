@@ -4,7 +4,6 @@ import { World } from './world.js';
 import { Shop, updateCoins } from './shop.js';
 import { AvatarViewer } from './avatar-viewer.js';
 
-// 1. Cargamos la partida
 let save = Storage.load();
 window.save = save; 
 window.Storage = Storage;
@@ -13,28 +12,31 @@ let world = null;
 let shop = null;
 let avatarViewer = null;
 
-// Valores por defecto del avatar
 if (!save.playerColor) save.playerColor = '#4a90e2';
 if (!save.playerGender) save.playerGender = 'm';
 if (!save.pantsColor) save.pantsColor = '#334155';
 if (!save.hairColor) save.hairColor = '#1c1917';
 
-// Arrancamos en el menú
 document.body.classList.add('in-menu');
 
 // ==========================================
 // PANTALLA COMPLETA
 // ==========================================
 function toggleFullScreen() {
-  if (!document.fullscreenElement) {
-    if (document.documentElement.requestFullscreen) {
-      document.documentElement.requestFullscreen().catch(err => {
-        console.log(`Error al intentar pantalla completa: ${err.message}`);
-      });
-    } else if (document.documentElement.webkitRequestFullscreen) { /* Safari */
-      document.documentElement.webkitRequestFullscreen();
-    } else if (document.documentElement.msRequestFullscreen) { /* IE11 */
-      document.documentElement.msRequestFullscreen();
+  if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    const el = document.documentElement;
+    if (el.requestFullscreen) {
+      el.requestFullscreen().catch(e => console.log(e));
+    } else if (el.webkitRequestFullscreen) {
+      el.webkitRequestFullscreen();
+    } else if (el.msRequestFullscreen) {
+      el.msRequestFullscreen();
+    }
+  } else {
+    if (document.exitFullscreen) {
+      document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      document.webkitExitFullscreen();
     }
   }
 }
@@ -46,18 +48,17 @@ const ui = {
   look: document.getElementById('lookZone'),
   play: document.getElementById('playButton'),
   name: document.getElementById('playerName'),
+  fullscreenBtn: document.getElementById('fullscreenBtn'), // 👈 NUEVO
   mainMenuBtn: document.getElementById('mainMenuBtn'),
   mainMenu: document.getElementById('mainMenu'),
   editToggle: document.getElementById('editToggle'),
   customizeAvatarBtn: document.getElementById('customizeAvatarBtn'),
   settingsBtn: document.getElementById('settingsBtn'),
-  
   avatarEditorScreen: document.getElementById('avatarEditorScreen'),
   avatarColorPicker: document.getElementById('avatarColorPicker'),
   avatarPantsPicker: document.getElementById('avatarPantsPicker'),
   avatarHairPicker: document.getElementById('avatarHairPicker'),
   avatarGenderPicker: document.getElementById('avatarGenderPicker'),
-
   settingsScreen: document.getElementById('settingsScreen'),
   settingsName: document.getElementById('settingsName'),
   settingsSensitivity: document.getElementById('settingsSensitivity'),
@@ -66,7 +67,6 @@ const ui = {
   settingsApply: document.getElementById('settingsApply'),
   settingsReset: document.getElementById('settingsReset'),
   backToMenu: document.getElementById('backToMenu'),
-
   placeConfirm: document.getElementById('placeConfirm'),
   placeCancel: document.getElementById('placeCancel'),
   moveConfirm: document.getElementById('moveConfirm'),
@@ -81,6 +81,11 @@ const ui = {
 };
 
 if (ui.name) ui.name.value = save.playerName ?? 'Invitado';
+
+// 👇 Evento del botón de pantalla completa
+if (ui.fullscreenBtn) {
+  ui.fullscreenBtn.addEventListener('click', toggleFullScreen);
+}
 
 // ==========================================
 // EDITOR DE AVATAR
@@ -168,7 +173,7 @@ document.querySelectorAll('.closeBtn[data-close="avatarEditorScreen"]').forEach(
 // ==========================================
 if (ui.play) {
   ui.play.addEventListener('click', () => {
-    // 👇 FORZAR PANTALLA COMPLETA AL ENTRAR AL JUEGO
+    // Intentar pantalla completa al darle a jugar también
     toggleFullScreen();
 
     save.playerName = ui.name.value.trim() || 'Invitado';
@@ -181,15 +186,12 @@ if (ui.play) {
     ui.hud.style.display = 'flex';
     ui.look.style.display = 'block';
     
-    // Mostrar controles
     document.getElementById('joystick').style.display = 'flex';
     document.getElementById('mainMenuBtn').style.display = 'flex';
     
-    // Mostrar botón de salto
     const jumpBtn = document.getElementById('jumpBtn');
     if (jumpBtn) jumpBtn.classList.add('visible');
     
-    // Ocultar botón de interactuar
     const interactBtn = document.getElementById('interactBtn');
     if (interactBtn) interactBtn.classList.remove('visible');
 
@@ -197,49 +199,7 @@ if (ui.play) {
   });
 }
 
-if (ui.settingsBtn) {
-  ui.settingsBtn.addEventListener('click', () => {
-    ui.settingsName.value = save.playerName;
-    ui.settingsSensitivity.value = save.sensitivity ?? 4;
-    ui.settingsSensValue.textContent = save.sensitivity ?? 4;
-    ui.settingsQuality.value = save.quality ?? 'media';
-    document.getElementById('settingsScreen').style.display = 'flex';
-  });
-}
-
-if (ui.settingsSensitivity) {
-  ui.settingsSensitivity.addEventListener('input', () => {
-    ui.settingsSensValue.textContent = ui.settingsSensitivity.value;
-  });
-}
-
-if (ui.settingsApply) {
-  ui.settingsApply.addEventListener('click', () => {
-    save.playerName = ui.settingsName.value.trim() || 'Invitado';
-    save.sensitivity = Number(ui.settingsSensitivity.value);
-    save.quality = ui.settingsQuality.value;
-    Storage.save(save);
-    if (ui.name) ui.name.value = save.playerName;
-    ui.settingsScreen.style.display = 'none';
-  });
-}
-
-if (ui.settingsReset) {
-  ui.settingsReset.addEventListener('click', () => {
-    if (confirm('¿Borrar todo el progreso?')) {
-      Storage.clear();
-      location.reload();
-    }
-  });
-}
-
-document.querySelectorAll('.closeBtn[data-close="settingsScreen"]').forEach(btn => {
-  btn.addEventListener('click', () => { ui.settingsScreen.style.display = 'none'; });
-});
-
-// ==========================================
-// FUNCIONES DEL JUEGO
-// ==========================================
+// ... (El resto del código de Ajustes y startWorld sigue exactamente igual) ...
 function mapSens(v) { return 0.0015 + (v - 1) * (0.0085 / 9); }
 
 function saveCurrentState() {
@@ -261,11 +221,9 @@ function startWorld() {
   const tryPlace = () => {
     const ok = world.confirmPlace();
     if (!ok) { ui.status.textContent = 'No se puede colocar aquí'; return; }
-
     shop.consumeSelected();
     const counts = shop.countInventory();
     const remaining = counts[world.selectedId] ?? 0;
-
     if (remaining <= 0) {
       world.cancelPlacement();
       if (shop) shop.clearSelection();
@@ -356,5 +314,46 @@ function startWorld() {
     ui.status.textContent = `Guardado · ${new Date().toLocaleTimeString()}`;
   }, 5000);
 }
+
+// Configurar ajustes desde el menú principal (si los tienes)
+if (ui.settingsBtn) {
+  ui.settingsBtn.addEventListener('click', () => {
+    ui.settingsName.value = save.playerName;
+    ui.settingsSensitivity.value = save.sensitivity ?? 4;
+    ui.settingsSensValue.textContent = save.sensitivity ?? 4;
+    ui.settingsQuality.value = save.quality ?? 'media';
+    document.getElementById('settingsScreen').style.display = 'flex';
+  });
+}
+
+if (ui.settingsSensitivity) {
+  ui.settingsSensitivity.addEventListener('input', () => {
+    ui.settingsSensValue.textContent = ui.settingsSensitivity.value;
+  });
+}
+
+if (ui.settingsApply) {
+  ui.settingsApply.addEventListener('click', () => {
+    save.playerName = ui.settingsName.value.trim() || 'Invitado';
+    save.sensitivity = Number(ui.settingsSensitivity.value);
+    save.quality = ui.settingsQuality.value;
+    Storage.save(save);
+    if (ui.name) ui.name.value = save.playerName;
+    ui.settingsScreen.style.display = 'none';
+  });
+}
+
+if (ui.settingsReset) {
+  ui.settingsReset.addEventListener('click', () => {
+    if (confirm('¿Borrar todo el progreso?')) {
+      Storage.clear();
+      location.reload();
+    }
+  });
+}
+
+document.querySelectorAll('.closeBtn[data-close="settingsScreen"]').forEach(btn => {
+  btn.addEventListener('click', () => { ui.settingsScreen.style.display = 'none'; });
+});
 
 window.addEventListener('beforeunload', () => { saveCurrentState(); });

@@ -2,11 +2,11 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <!-- Etiquetas para forzar pantalla completa en móvil -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Mi Vecindario 3D</title>
-  <!-- ... resto de tus links ... -->
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="in-menu">
@@ -29,15 +29,22 @@
         </div>
 
         <div class="menu-buttons" style="margin-top: 10px;">
-          <button id="customizeAvatarBtn" class="btn-secondary" style="border-color: #4ade80; color: #000000; margin-bottom: 8px;">👕 Personalizar Avatar</button>
+          <button id="customizeAvatarBtn" class="btn-secondary" style="border-color: #4ade80; color: #4ade80; margin-bottom: 8px;">👕 Personalizar Avatar</button>
           <button id="playButton" class="btn-primary">JUGAR</button>
-          <button id="settingsBtn" class="btn-secondary">⚙ Ajustes</button>
+          
+          <!-- Botones de Pantalla Completa y Ajustes -->
+          <div style="display: flex; gap: 8px; margin-top: 8px;">
+            <button id="fullscreenBtn" class="btn-secondary" style="margin: 0;">⛶ Pantalla Completa</button>
+            <button id="settingsBtn" class="btn-secondary" style="margin: 0;">⚙ Ajustes</button>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- EDITOR DE AVATAR -->
+  <!-- =====================================================
+       EDITOR DE AVATAR (Modal flotante)
+       ===================================================== -->
   <div id="avatarEditorScreen" class="overlay" style="display:none; z-index: 100;">
     <div class="avatar-modal">
       <header>
@@ -89,7 +96,9 @@
     <button id="backToMenu" class="ghost">↩ Salir al menú</button>
   </div>
 
-  <!-- TIENDA -->
+  <!-- =====================================================
+       TIENDA
+       ===================================================== -->
   <div id="shopScreen" class="fullscreen" style="display:none">
     <header>
       <h2>🛒 Tienda</h2>
@@ -115,7 +124,9 @@
     </div>
   </div>
 
-  <!-- INVENTARIO -->
+  <!-- =====================================================
+       INVENTARIO
+       ===================================================== -->
   <div id="inventoryScreen" class="fullscreen" style="display:none">
     <header>
       <h2>🎒 Inventario</h2>
@@ -129,7 +140,9 @@
     </div>
   </div>
 
-  <!-- VENDER -->
+  <!-- =====================================================
+       VENDER
+       ===================================================== -->
   <div id="sellScreen" class="fullscreen" style="display:none">
     <header>
       <h2>💰 Vender muebles</h2>
@@ -142,7 +155,9 @@
     </div>
   </div>
 
-  <!-- TV PANEL -->
+  <!-- =====================================================
+       TV PANEL
+       ===================================================== -->
   <div id="tvPanel" class="fullscreen" style="display:none">
     <header>
       <h2 id="tvPanelTitle">📺 Configurar TV</h2>
@@ -170,7 +185,9 @@
     <button id="tvOverlayClose">✕</button>
   </div>
 
-  <!-- AJUSTES -->
+  <!-- =====================================================
+       PANEL DE AJUSTES
+       ===================================================== -->
   <div id="settingsScreen" class="fullscreen" style="display:none">
     <header>
       <h2>⚙ Ajustes</h2>
@@ -194,7 +211,9 @@
     <button id="settingsReset" class="ghost" style="margin-top:12px">🗑 Borrar progreso</button>
   </div>
 
-  <!-- BARRA DE PERSONALIZACIÓN -->
+  <!-- =====================================================
+       BARRA DE PERSONALIZACIÓN
+       ===================================================== -->
   <div id="customizeBar" style="display:none">
     <div id="colorPicker" style="display:none">
       <p>Color</p>
@@ -234,7 +253,7 @@
   <!-- Joystick -->
   <div id="joystick"><div id="stick"></div></div>
   
-  <!-- Botón de salto (Sin style="display:none" para que CSS controle) -->
+  <!-- Botón de salto -->
   <button id="jumpBtn" aria-label="Saltar">
     <span>⤒</span>
   </button>
@@ -242,10 +261,24 @@
   <!-- Botón de interacción -->
   <button id="interactBtn">💬</button>
 
+  <!-- Scripts -->
+  <script>
+    // 👇 DIAGNÓSTICO PARA GITHUB (Muestra un error legible si falta un archivo)
+    window.addEventListener('error', function(e) {
+      if (e.message.includes('Failed to fetch dynamically imported module') || e.message.includes('404')) {
+        document.body.innerHTML = `<div style="padding:20px; color:#fff; background:#e24a4a; font-family:sans-serif;">
+          <h2>Error de carga en GitHub</h2>
+          <p>Faltan archivos o hay un error de mayúsculas/minúsculas. Revisa la consola (F12) para ver qué archivo exacto no se encontró.</p>
+          <p>Detalle: ${e.message}</p>
+        </div>`;
+      }
+    });
+  </script>
+  
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
   <script type="importmap">
   { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
   </script>
-  <script type="module" src="main.js?v=17"></script>
+  <script type="module" src="main.js?v=19"></script>
 </body>
 </html>
