@@ -1,4 +1,5 @@
 // main.js
+alert("¡El main.js se está ejecutando!");
 import { Storage } from './storage.js';
 import { World } from './world.js';
 import { Shop, updateCoins } from './shop.js';
