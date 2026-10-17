@@ -3,13 +3,13 @@ import { Storage } from './storage.js';
 import { World } from './world.js';
 import { Shop, updateCoins } from './shop.js';
 
-// Intentamos importar el visor del avatar de forma segura
 let AvatarViewer = null;
+// Intentamos cargar el visor del avatar de forma segura
 try {
   const mod = await import('./avatar-viewer.js');
   AvatarViewer = mod.AvatarViewer;
 } catch (e) {
-  console.warn("No se pudo cargar el AvatarViewer. El juego seguirá funcionando sin él.", e);
+  console.warn("Aviso: Falló la carga de avatar-viewer.js. El juego seguirá sin el editor de avatar.", e);
 }
 
 let save = Storage.load();
@@ -84,7 +84,7 @@ const ui = {
 if (ui.name) ui.name.value = save.playerName ?? 'Invitado';
 
 // ==========================================
-// BOTONES BÁSICOS (Se configuran PRIMERO)
+// BOTONES DEL MENÚ (Se configuran PRIMERO)
 // ==========================================
 if (ui.fullscreenBtn) {
   ui.fullscreenBtn.addEventListener('click', toggleFullScreen);
@@ -161,7 +161,7 @@ document.querySelectorAll('.closeBtn[data-close="settingsScreen"]').forEach(btn 
 });
 
 // ==========================================
-// EDITOR DE AVATAR (Protegido contra fallos)
+// EDITOR DE AVATAR
 // ==========================================
 const SHIRT_COLORS = ['#4a90e2', '#e24a4a', '#4caf50', '#f0c050', '#9c27b0', '#1a1a22', '#f97316', '#14b8a6', '#ec4899', '#ffffff', '#8b5cf6', '#64748b', '#fcd34d', '#ef4444', '#10b981', '#3b82f6', '#6366f1', '#a855f7', '#78350f', '#c2b280', '#ff8c00', '#00ced1', '#ff69b4', '#e6e6fa'];
 const PANTS_COLORS = ['#334155', '#1a1a22', '#3b82f6', '#64748b', '#78350f', '#c2b280', '#e24a4a', '#4caf50', '#ffffff', '#000000'];
@@ -220,7 +220,7 @@ if (ui.avatarGenderPicker) {
 if (ui.customizeAvatarBtn) {
   ui.customizeAvatarBtn.addEventListener('click', () => {
     if (!AvatarViewer) {
-      alert("El editor de avatar no está disponible (falló la carga del módulo). Puedes jugar igual.");
+      alert("El editor de avatar no está disponible. Puedes jugar igual.");
       return;
     }
     ui.avatarEditorScreen.style.display = 'flex';
@@ -246,7 +246,7 @@ document.querySelectorAll('.closeBtn[data-close="avatarEditorScreen"]').forEach(
 });
 
 // ==========================================
-// RESTO DEL JUEGO
+// FUNCIONES DEL MUNDO
 // ==========================================
 function mapSens(v) { return 0.0015 + (v - 1) * (0.0085 / 9); }
 
@@ -267,8 +267,8 @@ function startWorld() {
     window.world = world; 
     world.controls.setSensitivity(mapSens(save.sensitivity ?? 4));
   } catch (e) {
-    console.error("Error al iniciar el mundo:", e);
-    alert("Hubo un error al cargar el mundo 3D. Revisa la consola (F12).");
+    console.error("Error crítico al crear el mundo:", e);
+    alert("Error al cargar el mundo 3D. Revisa la consola (F12) para más detalles.");
     return;
   }
 
@@ -361,11 +361,7 @@ function startWorld() {
     if (confirm('¿Salir al menú principal? Se guardará el progreso.')) { saveCurrentState(); location.reload(); }
   });
 
-  try {
-    world.start(() => {});
-  } catch (e) {
-    console.error("Error en el bucle del mundo:", e);
-  }
+  world.start(() => {});
 
   setInterval(() => {
     saveCurrentState();
