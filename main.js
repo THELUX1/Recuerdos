@@ -4,7 +4,7 @@ import { World } from './world.js';
 import { Shop, updateCoins } from './shop.js';
 import { AvatarViewer } from './avatar-viewer.js';
 
-// 1. Cargamos la partida y la hacemos global para poder editarla desde la consola
+// 1. Cargamos la partida
 let save = Storage.load();
 window.save = save; 
 window.Storage = Storage;
@@ -21,6 +21,23 @@ if (!save.hairColor) save.hairColor = '#1c1917';
 
 // Arrancamos en el menú
 document.body.classList.add('in-menu');
+
+// ==========================================
+// PANTALLA COMPLETA
+// ==========================================
+function toggleFullScreen() {
+  if (!document.fullscreenElement) {
+    if (document.documentElement.requestFullscreen) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.log(`Error al intentar pantalla completa: ${err.message}`);
+      });
+    } else if (document.documentElement.webkitRequestFullscreen) { /* Safari */
+      document.documentElement.webkitRequestFullscreen();
+    } else if (document.documentElement.msRequestFullscreen) { /* IE11 */
+      document.documentElement.msRequestFullscreen();
+    }
+  }
+}
 
 const ui = {
   menu: document.getElementById('menu'),
@@ -151,6 +168,9 @@ document.querySelectorAll('.closeBtn[data-close="avatarEditorScreen"]').forEach(
 // ==========================================
 if (ui.play) {
   ui.play.addEventListener('click', () => {
+    // 👇 FORZAR PANTALLA COMPLETA AL ENTRAR AL JUEGO
+    toggleFullScreen();
+
     save.playerName = ui.name.value.trim() || 'Invitado';
     Storage.save(save);
 
@@ -235,7 +255,7 @@ function saveCurrentState() {
 
 function startWorld() {
   world = new World(save);
-  window.world = world; // 👈 Para poder acceder desde la consola
+  window.world = world; 
   world.controls.setSensitivity(mapSens(save.sensitivity ?? 4));
 
   const tryPlace = () => {
