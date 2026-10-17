@@ -27,13 +27,11 @@ if (!save.hairColor) save.hairColor = '#1c1917';
 document.body.classList.add('in-menu');
 
 // ==========================================
-// PANTALLA COMPLETA (CORREGIDO)
+// PANTALLA COMPLETA
 // ==========================================
 function toggleFullScreen() {
   if (!document.fullscreenElement && !document.webkitFullscreenElement) {
     const el = document.documentElement;
-    
-    // Escuchar cuando el navegador cambie a pantalla completa para avisarle al mundo
     const onFullscreenChange = () => {
       if (world && typeof world._resize === 'function') {
         world._resize(); 
@@ -41,7 +39,6 @@ function toggleFullScreen() {
       document.removeEventListener('fullscreenchange', onFullscreenChange);
       document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
     };
-    
     document.addEventListener('fullscreenchange', onFullscreenChange);
     document.addEventListener('webkitfullscreenchange', onFullscreenChange);
 
@@ -96,7 +93,39 @@ const ui = {
 if (ui.name) ui.name.value = save.playerName ?? 'Invitado';
 
 // ==========================================
-// BOTONES DEL MENÚ (Se configuran PRIMERO)
+// MODAL DE CONFIRMACIÓN PERSONALIZADO
+// ==========================================
+const confirmModal = document.getElementById('customConfirm');
+const confirmTitle = document.getElementById('confirmTitle');
+const confirmMsg = document.getElementById('confirmMsg');
+const confirmAcceptBtn = document.getElementById('confirmAcceptBtn');
+const confirmCancelBtn = document.getElementById('confirmCancelBtn');
+
+function showCustomConfirm(title, msg) {
+  return new Promise((resolve) => {
+    confirmTitle.textContent = title;
+    confirmMsg.textContent = msg;
+    confirmModal.style.display = 'flex';
+
+    // Limpiamos eventos anteriores clonando los botones
+    const newAccept = confirmAcceptBtn.cloneNode(true);
+    const newCancel = confirmCancelBtn.cloneNode(true);
+    confirmAcceptBtn.replaceWith(newAccept);
+    confirmCancelBtn.replaceWith(newCancel);
+
+    newAccept.onclick = () => {
+      confirmModal.style.display = 'none';
+      resolve(true);
+    };
+    newCancel.onclick = () => {
+      confirmModal.style.display = 'none';
+      resolve(false);
+    };
+  });
+}
+
+// ==========================================
+// BOTONES DEL MENÚ
 // ==========================================
 if (ui.fullscreenBtn) {
   ui.fullscreenBtn.addEventListener('click', toggleFullScreen);
@@ -104,7 +133,7 @@ if (ui.fullscreenBtn) {
 
 if (ui.play) {
   ui.play.addEventListener('click', () => {
-    toggleFullScreen(); // Intentar pantalla completa al darle a jugar
+    toggleFullScreen();
 
     save.playerName = ui.name.value.trim() || 'Invitado';
     Storage.save(save);
@@ -131,7 +160,6 @@ if (ui.play) {
 
     startWorld();
 
-    // Forzar un redimensionamiento después de que la pantalla se ajuste (evita que se vea cortado)
     setTimeout(() => {
       if (world && typeof world._resize === 'function') {
         world._resize();
@@ -168,8 +196,9 @@ if (ui.settingsApply) {
 }
 
 if (ui.settingsReset) {
-  ui.settingsReset.addEventListener('click', () => {
-    if (confirm('¿Borrar todo el progreso?')) {
+  ui.settingsReset.addEventListener('click', async () => {
+    const quiereBorrar = await showCustomConfirm('¿Borrar progreso?', 'Se perderán todos tus muebles y monedas para siempre.');
+    if (quiereBorrar) {
       Storage.clear();
       location.reload();
     }
@@ -377,8 +406,13 @@ function startWorld() {
     ui.settingsScreen.style.display = 'flex';
   });
 
-  ui.backToMenu.addEventListener('click', () => {
-    if (confirm('¿Salir al menú principal? Se guardará el progreso.')) { saveCurrentState(); location.reload(); }
+  // Salir al menú (Usando el modal personalizado)
+  ui.backToMenu.addEventListener('click', async () => {
+    const quiereSalir = await showCustomConfirm('¿Salir al menú principal?', 'Se guardará todo el progreso.');
+    if (quiereSalir) {
+      saveCurrentState();
+      location.reload();
+    }
   });
 
   world.start(() => {});

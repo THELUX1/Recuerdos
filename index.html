@@ -261,49 +261,38 @@
   <!-- Botón de interacción -->
   <button id="interactBtn">💬</button>
 
+  <!-- =====================================================
+       MODAL DE CONFIRMACIÓN PERSONALIZADO
+       ===================================================== -->
+  <div id="customConfirm" class="overlay" style="display:none; z-index: 9999;">
+    <div class="confirm-box">
+      <h3 id="confirmTitle">¿Salir al menú principal?</h3>
+      <p id="confirmMsg">Se guardará todo el progreso.</p>
+      <div class="confirm-buttons">
+        <button id="confirmCancelBtn" class="btn-secondary">Cancelar</button>
+        <button id="confirmAcceptBtn" class="btn-primary">Aceptar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script>
-  // DIAGNÓSTICO AVANZADO
-  window.addEventListener('error', function(e) {
-    // Ignorar errores de imágenes o favicon
-    if (e.target && e.target.tagName === 'IMG') return;
-    
-    let msg = e.message || (e.error && e.error.message) || 'Error desconocido';
-    let file = e.filename ? e.filename.split('/').pop() : 'desconocido';
-    let line = e.lineno || '?';
-
-    // Si es un error de carga de módulo (típico en GitHub)
-    if (msg.includes('Failed to fetch') || msg.includes('Importing a module script failed') || msg.includes('404')) {
-      document.body.innerHTML = `
-        <div style="padding: 30px; color: white; background: #b91c1c; font-family: monospace; height: 100vh; box-sizing: border-box;">
-          <h2 style="margin-top:0;">⚠️ Error crítico de carga (GitHub)</h2>
-          <p>El navegador no puede encontrar uno de tus archivos JS.</p>
-          <p><b>Archivo:</b> ${file}</p>
-          <p><b>Mensaje:</b> ${msg}</p>
-          <hr style="border-color: rgba(255,255,255,0.2); margin: 20px 0;">
-          <p>Revisa en GitHub que:</p>
-          <ul>
-            <li>El archivo <b>${file}</b> exista y esté subido.</li>
-            <li>El nombre sea exactamente igual (mayúsculas/minúsculas).</li>
-            <li>La ruta en los <code>import</code> empiece con <code>./</code></li>
-          </ul>
+    // DIAGNÓSTICO PARA GITHUB (Muestra un error legible si falta un archivo)
+    window.addEventListener('error', function(e) {
+      if (e.message.includes('Failed to fetch dynamically imported module') || e.message.includes('404')) {
+        document.body.innerHTML = `<div style="padding:20px; color:#fff; background:#e24a4a; font-family:sans-serif;">
+          <h2>Error de carga en GitHub</h2>
+          <p>Faltan archivos o hay un error de mayúsculas/minúsculas. Revisa la consola (F12) para ver qué archivo exacto no se encontró.</p>
+          <p>Detalle: ${e.message}</p>
         </div>`;
-    }
-  }, true);
-
-  // Si después de 3 segundos el juego no cargó, mostrar alerta
-  setTimeout(() => {
-    if (!window.world && document.getElementById('menu').style.display !== 'none') {
-      // Si seguimos en el menú y no hay error en rojo, es que el botón Jugar no se conectó
-      console.log("El menú cargó, pero la lógica del botón Jugar no se ha inicializado.");
-    }
-  }, 3000);
-</script>
+      }
+    });
+  </script>
   
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
   <script type="importmap">
   { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
   </script>
-  <script type="module" src="./main.js"></script>
+  <script type="module" src="./main.js?v=20"></script>
 </body>
 </html>
