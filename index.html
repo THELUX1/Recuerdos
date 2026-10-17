@@ -2,94 +2,247 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lo que siento</title>
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      padding: 32px 16px;
-      background: #f3eee8;
-      color: #302b29;
-      font-family: Georgia, "Times New Roman", serif;
-    }
-
-    .carta {
-      width: min(720px, 100%);
-      background: #fffdf9;
-      padding: clamp(32px, 7vw, 68px);
-      box-shadow: 0 18px 50px rgba(54, 42, 34, 0.12);
-      border-radius: 3px;
-      position: relative;
-    }
-
-    .carta::before {
-      content: "";
-      display: block;
-      width: 46px;
-      height: 2px;
-      background: #8f8178;
-      margin-bottom: 28px;
-    }
-
-    h1 {
-      margin: 0 0 34px;
-      font-size: clamp(30px, 6vw, 46px);
-      font-weight: normal;
-      letter-spacing: -0.5px;
-    }
-
-    p {
-      margin: 0 0 22px;
-      font-size: 18px;
-      line-height: 1.85;
-    }
-
-    .pregunta {
-      font-style: italic;
-      margin-top: 30px;
-    }
-
-    .final {
-      margin-top: 34px;
-      font-style: italic;
-    }
-
-    @media (max-width: 520px) {
-      body { padding: 18px 10px; }
-      .carta { padding: 30px 25px; }
-      p { font-size: 17px; line-height: 1.75; }
-    }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Mi Vecindario 3D</title>
+  <link rel="stylesheet" href="style.css">
 </head>
-<body>
-  <main class="carta">
-    <p>¿Cuál es el punto de intentar conocer a alguien más si yo solo te quiero a vos? ¿No estaría engañando a esa persona y, al mismo tiempo, engañándome a mí mismo?</p>
+<body class="in-menu">
+  <canvas id="scene"></canvas>
 
-    <p>Ahora ya no solo casi no me escribís; directamente, a veces, ni siquiera me clavás el visto. Ya no me mandás Reels. Ya no están esas ganas que antes tenías de hablarme sobre tu día, de contarme cómo te sentías, para que yo pudiera escucharte, acompañarte y tratar de motivarte.</p>
+  <!-- Menú inicial -->
+  <div id="menu" class="menu-screen">
+    <div class="menu-bg"></div>
+    
+    <div class="menu-content">
+      <div class="menu-header">
+        <h1>Mi Vecindario</h1>
+        <p>Construye tu mundo</p>
+      </div>
 
-    <p>Y es gracioso, ¿no? Recuerdo que, cuando estábamos caminando y hablando, te dije que algún día ibas a conocer a alguien y que nosotros ya no íbamos a estar como antes y me dijiste que eso no iba a pasar. Al final pasó, tenía razón.</p>
+      <div class="menu-card">
+        <div class="input-group">
+          <label>Tu nombre</label>
+          <input type="text" id="playerName" placeholder="Ej: Juan" maxlength="15" autocomplete="off">
+        </div>
 
-    <p class="pregunta">Lo que no entiendo es por qué.</p>
+        <div class="menu-buttons" style="margin-top: 10px;">
+          <button id="customizeAvatarBtn" class="btn-secondary" style="border-color: #4ade80; color: #000000; margin-bottom: 8px;">👕 Personalizar Avatar</button>
+          <button id="playButton" class="btn-primary">JUGAR</button>
+          <button id="settingsBtn" class="btn-secondary">⚙ Ajustes</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
-    <p>¿Por qué decirme que me querés? ¿Por qué decirme que tenías ganas de verme y salir conmigo? ¿Por qué contarme que a veces tenías ganas de invitarme, pero te daba vergüenza? ¿Por qué decírmelo a mí y no al chico que tanto te gusta?</p>
+  <!-- EDITOR DE AVATAR -->
+  <div id="avatarEditorScreen" class="overlay" style="display:none; z-index: 100;">
+    <div class="avatar-modal">
+      <header>
+        <h2>👕 Tu Avatar</h2>
+        <button class="closeBtn" data-close="avatarEditorScreen">✕</button>
+      </header>
 
-    <p>Todo eso no me deja dormir.</p>
+      <div class="avatar-editor-content">
+        <div class="avatar-preview-box">
+          <canvas id="avatar-editor-canvas"></canvas>
+        </div>
 
-    <p>Me quedo preguntándome por qué, si tan bien nos llevábamos y si yo te hacía sentir tan bien, de repente apareció alguien que ni siquiera sabe cosas de vos que yo sí conozco, alguien que no estuvo ahí para escucharte, acompañarte y conocer cada una de esas pequeñas cosas que fui descubriendo de vos… y aun así logró hacerte sentir algo que yo no pude.</p>
+        <div class="avatar-options-box">
+          <p class="hint" style="margin-top:0;">Género</p>
+          <div class="gender-picker" id="avatarGenderPicker" style="margin-bottom: 15px;">
+            <button class="gender-btn active" data-gender="m">👦 Masculino</button>
+            <button class="gender-btn" data-gender="f">👧 Femenino</button>
+          </div>
 
-    <p>Supongo que, al final, no siempre gana el más gracioso, ni el que más se esfuerza, ni el que intenta hacer las cosas medianamente bien.</p>
+          <p class="hint">Color de ropa</p>
+          <div class="color-carousel" id="avatarColorPicker"></div>
 
-    <p>Y quizás eso es lo que más me duele: darme cuenta de que podés conocer profundamente a alguien, quererla con todo lo que tenés y aun así no ser la persona que elige.</p>
+          <p class="hint">Color de pantalón</p>
+          <div class="color-carousel" id="avatarPantsPicker"></div>
 
-    <p>Supongo que quizá solo necesitabas a alguien con quien distraerte, alguien a quien contarle todo aquello que no podías contarle a otro.</p>
+          <p class="hint">Color de cabello</p>
+          <div class="color-carousel" id="avatarHairPicker"></div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-    <p class="final">Y yo, sin darme cuenta, terminé queriéndote mucho más de lo que imaginé.</p>
-    <p>Yo solo voy a dejar de quererte el día que tenga la certeza de que alguien te quiere solo un poquito más de lo que yo te quiero</p>
-  </main>
+  <!-- HUD -->
+  <div id="hud">
+    <span id="status">Listo</span>
+    <span id="coins">🪙 0</span>
+    <span id="clock">🕐 12:00</span>
+  </div>
+
+  <!-- Botón menú único (arriba derecha) -->
+  <button id="mainMenuBtn">☰</button>
+
+  <!-- Panel del menú principal (desplegable) -->
+  <div id="mainMenu" style="display:none">
+    <button id="shopToggle">🛒 Tienda</button>
+    <button id="inventoryToggle">🎒 Inventario</button>
+    <button id="editToggle">✏️ Editar</button>
+    <button id="settingsToggle">⚙ Ajustes</button>
+    <button id="backToMenu" class="ghost">↩ Salir al menú</button>
+  </div>
+
+  <!-- TIENDA -->
+  <div id="shopScreen" class="fullscreen" style="display:none">
+    <header>
+      <h2>🛒 Tienda</h2>
+      <button class="closeBtn" data-close="shopScreen">✕</button>
+    </header>
+    <div class="tabs">
+      <button class="tab active" data-tab="cama">Camas</button>
+      <button class="tab" data-tab="mesa">Mesas</button>
+      <button class="tab" data-tab="silla">Sillas</button>
+      <button class="tab" data-tab="mueble">🪑 Muebles</button>
+      <button class="tab" data-tab="cocina">🍳 Cocina</button>
+      <button class="tab" data-tab="luz">💡 Luces</button>
+      <button class="tab" data-tab="planta">Plantas</button>
+      <button class="tab" data-tab="otro">Otros</button>
+      <button class="tab" data-tab="piso">🟫 Suelos</button>
+      <button class="tab" data-tab="muro">🧱 Muros</button>
+      <button class="tab" data-tab="escalera">🪜 Escaleras</button>
+      <button class="tab" data-tab="electro">🔌 Electro</button>
+    </div>
+    <div class="shop-content" id="shopGrid"></div>
+    <div class="shop-footer">
+      <span>🪙 Monedas: <b id="shopCoins">0</b></span>
+    </div>
+  </div>
+
+  <!-- INVENTARIO -->
+  <div id="inventoryScreen" class="fullscreen" style="display:none">
+    <header>
+      <h2>🎒 Inventario</h2>
+      <button class="closeBtn" data-close="inventoryScreen">✕</button>
+    </header>
+    <p class="hint">Toca un mueble para colocarlo.</p>
+    <div class="shop-content" id="inventoryGrid"></div>
+    <div class="shop-footer">
+      <button id="inventorySellBtn" class="sell">💰 Vender</button>
+      <button id="inventoryCancelBtn" class="ghost">✕</button>
+    </div>
+  </div>
+
+  <!-- VENDER -->
+  <div id="sellScreen" class="fullscreen" style="display:none">
+    <header>
+      <h2>💰 Vender muebles</h2>
+      <button class="closeBtn" data-close="sellScreen">✕</button>
+    </header>
+    <p class="hint">Toca un mueble para venderlo por el 50% de su precio.</p>
+    <div class="shop-content" id="sellGrid"></div>
+    <div class="shop-footer">
+      <span>Recuperas la mitad del valor original.</span>
+    </div>
+  </div>
+
+  <!-- TV PANEL -->
+  <div id="tvPanel" class="fullscreen" style="display:none">
+    <header>
+      <h2 id="tvPanelTitle">📺 Configurar TV</h2>
+      <button class="closeBtn" data-close="tvPanel">✕</button>
+    </header>
+    <p class="hint" id="tvPanelHint">Pega un enlace de imagen, GIF, video, audio o YouTube.</p>
+    <input id="tvUrl" type="url" placeholder="https://..." autocomplete="off">
+    <div class="tv-actions">
+      <button id="tvLoad">▶ Reproducir</button>
+      <button id="tvStop" class="ghost">⏹ Detener</button>
+    </div>
+    <div id="tvSamplesContainer">
+      <p class="hint" style="margin-top:16px">Ejemplos rápidos:</p>
+      <div class="tv-samples">
+        <button data-sample="https://picsum.photos/800/450">🖼 Imagen</button>
+        <button data-sample="https://media.giphy.com/media/26tn33aiTi1jkl6H6/giphy.gif">🎞 GIF</button>
+        <button data-sample="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4">🎬 Video</button>
+        <button data-sample="https://www.youtube.com/watch?v=dQw4w9WgXcQ">▶️ YouTube</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="tvOverlay" style="display:none">
+    <div id="tvOverlayInner"></div>
+    <button id="tvOverlayClose">✕</button>
+  </div>
+
+  <!-- AJUSTES -->
+  <div id="settingsScreen" class="fullscreen" style="display:none">
+    <header>
+      <h2>⚙ Ajustes</h2>
+      <button class="closeBtn" data-close="settingsScreen">✕</button>
+    </header>
+    <label>Nombre
+      <input id="settingsName" type="text" maxlength="16">
+    </label>
+    <label>Sensibilidad de cámara
+      <input id="settingsSensitivity" type="range" min="1" max="10" step="1">
+      <span id="settingsSensValue">4</span>
+    </label>
+    <label>Calidad gráfica
+      <select id="settingsQuality">
+        <option value="baja">Baja</option>
+        <option value="media">Media</option>
+        <option value="alta">Alta</option>
+      </select>
+    </label>
+    <button id="settingsApply">Aplicar cambios</button>
+    <button id="settingsReset" class="ghost" style="margin-top:12px">🗑 Borrar progreso</button>
+  </div>
+
+  <!-- BARRA DE PERSONALIZACIÓN -->
+  <div id="customizeBar" style="display:none">
+    <div id="colorPicker" style="display:none">
+      <p>Color</p>
+      <div id="colorSwatches"></div>
+    </div>
+    <div id="stylePicker" style="display:none">
+      <p>Estilo</p>
+      <div id="styleSwatches"></div>
+    </div>
+  </div>
+
+  <div id="placeBar" style="display:none">
+    <span>Mueve la vista y toca <b>Colocar</b></span>
+    <button id="rotateBtn">↻</button>
+    <button id="placeConfirm">✓ Colocar aquí</button>
+    <button id="placeCancel" class="ghost">✕</button>
+  </div>
+
+  <div id="editCursor" style="display:none"></div>
+
+  <div id="editPanel" style="display:none">
+    <span id="editInfo">Mueble seleccionado</span>
+    <button id="editContent" style="display:none" title="Contenido">📺</button>
+    <button id="editMove" title="Mover">↔</button>
+    <button id="editDelete" class="danger" title="Eliminar">🗑</button>
+    <button id="editClose" class="ghost" title="Cerrar">✕</button>
+  </div>
+
+  <div id="moveBar" style="display:none">
+    <span>Mueve la vista y confirma</span>
+    <button id="moveConfirm">✓ Mover aquí</button>
+    <button id="moveCancel" class="ghost">✕</button>
+  </div>
+
+  <div id="lookZone"></div>
+
+  <!-- Joystick -->
+  <div id="joystick"><div id="stick"></div></div>
+  
+  <!-- Botón de salto (Sin style="display:none" para que CSS controle) -->
+  <button id="jumpBtn" aria-label="Saltar">
+    <span>⤒</span>
+  </button>
+
+  <!-- Botón de interacción -->
+  <button id="interactBtn">💬</button>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
+  <script type="importmap">
+  { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+  </script>
+  <script type="module" src="main.js?v=17"></script>
 </body>
 </html>
