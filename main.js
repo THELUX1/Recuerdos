@@ -2,10 +2,18 @@
 import { Storage } from './storage.js';
 import { World } from './world.js';
 import { Shop, updateCoins } from './shop.js';
-import { AvatarViewer } from './avatar-viewer.js';
+
+// Intentamos importar el visor del avatar de forma segura
+let AvatarViewer = null;
+try {
+  const mod = await import('./avatar-viewer.js');
+  AvatarViewer = mod.AvatarViewer;
+} catch (e) {
+  console.warn("No se pudo cargar el AvatarViewer. El juego seguirá funcionando sin él.", e);
+}
 
 let save = Storage.load();
-window.save = save; 
+window.save = save;
 window.Storage = Storage;
 
 let world = null;
@@ -25,19 +33,12 @@ document.body.classList.add('in-menu');
 function toggleFullScreen() {
   if (!document.fullscreenElement && !document.webkitFullscreenElement) {
     const el = document.documentElement;
-    if (el.requestFullscreen) {
-      el.requestFullscreen().catch(e => console.log(e));
-    } else if (el.webkitRequestFullscreen) {
-      el.webkitRequestFullscreen();
-    } else if (el.msRequestFullscreen) {
-      el.msRequestFullscreen();
-    }
+    if (el.requestFullscreen) el.requestFullscreen().catch(e => console.log(e));
+    else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+    else if (el.msRequestFullscreen) el.msRequestFullscreen();
   } else {
-    if (document.exitFullscreen) {
-      document.exitFullscreen();
-    } else if (document.webkitExitFullscreen) {
-      document.webkitExitFullscreen();
-    }
+    if (document.exitFullscreen) document.exitFullscreen();
+    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
   }
 }
 
@@ -48,7 +49,7 @@ const ui = {
   look: document.getElementById('lookZone'),
   play: document.getElementById('playButton'),
   name: document.getElementById('playerName'),
-  fullscreenBtn: document.getElementById('fullscreenBtn'), // 👈 NUEVO
+  fullscreenBtn: document.getElementById('fullscreenBtn'),
   mainMenuBtn: document.getElementById('mainMenuBtn'),
   mainMenu: document.getElementById('mainMenu'),
   editToggle: document.getElementById('editToggle'),
@@ -82,13 +83,85 @@ const ui = {
 
 if (ui.name) ui.name.value = save.playerName ?? 'Invitado';
 
-// 👇 Evento del botón de pantalla completa
+// ==========================================
+// BOTONES BÁSICOS (Se configuran PRIMERO)
+// ==========================================
 if (ui.fullscreenBtn) {
   ui.fullscreenBtn.addEventListener('click', toggleFullScreen);
 }
 
+if (ui.play) {
+  ui.play.addEventListener('click', () => {
+    toggleFullScreen();
+    save.playerName = ui.name.value.trim() || 'Invitado';
+    Storage.save(save);
+
+    document.body.classList.remove('in-menu');
+    ui.menu.style.display = 'none';
+    
+    if (avatarViewer) avatarViewer.stop();
+
+    ui.hud.style.display = 'flex';
+    ui.look.style.display = 'block';
+    
+    const joystick = document.getElementById('joystick');
+    if (joystick) joystick.style.display = 'flex';
+    
+    const mainMenuBtn = document.getElementById('mainMenuBtn');
+    if (mainMenuBtn) mainMenuBtn.style.display = 'flex';
+    
+    const jumpBtn = document.getElementById('jumpBtn');
+    if (jumpBtn) jumpBtn.classList.add('visible');
+    
+    const interactBtn = document.getElementById('interactBtn');
+    if (interactBtn) interactBtn.classList.remove('visible');
+
+    startWorld();
+  });
+}
+
+if (ui.settingsBtn) {
+  ui.settingsBtn.addEventListener('click', () => {
+    ui.settingsName.value = save.playerName;
+    ui.settingsSensitivity.value = save.sensitivity ?? 4;
+    ui.settingsSensValue.textContent = save.sensitivity ?? 4;
+    ui.settingsQuality.value = save.quality ?? 'media';
+    document.getElementById('settingsScreen').style.display = 'flex';
+  });
+}
+
+if (ui.settingsSensitivity) {
+  ui.settingsSensitivity.addEventListener('input', () => {
+    ui.settingsSensValue.textContent = ui.settingsSensitivity.value;
+  });
+}
+
+if (ui.settingsApply) {
+  ui.settingsApply.addEventListener('click', () => {
+    save.playerName = ui.settingsName.value.trim() || 'Invitado';
+    save.sensitivity = Number(ui.settingsSensitivity.value);
+    save.quality = ui.settingsQuality.value;
+    Storage.save(save);
+    if (ui.name) ui.name.value = save.playerName;
+    ui.settingsScreen.style.display = 'none';
+  });
+}
+
+if (ui.settingsReset) {
+  ui.settingsReset.addEventListener('click', () => {
+    if (confirm('¿Borrar todo el progreso?')) {
+      Storage.clear();
+      location.reload();
+    }
+  });
+}
+
+document.querySelectorAll('.closeBtn[data-close="settingsScreen"]').forEach(btn => {
+  btn.addEventListener('click', () => { ui.settingsScreen.style.display = 'none'; });
+});
+
 // ==========================================
-// EDITOR DE AVATAR
+// EDITOR DE AVATAR (Protegido contra fallos)
 // ==========================================
 const SHIRT_COLORS = ['#4a90e2', '#e24a4a', '#4caf50', '#f0c050', '#9c27b0', '#1a1a22', '#f97316', '#14b8a6', '#ec4899', '#ffffff', '#8b5cf6', '#64748b', '#fcd34d', '#ef4444', '#10b981', '#3b82f6', '#6366f1', '#a855f7', '#78350f', '#c2b280', '#ff8c00', '#00ced1', '#ff69b4', '#e6e6fa'];
 const PANTS_COLORS = ['#334155', '#1a1a22', '#3b82f6', '#64748b', '#78350f', '#c2b280', '#e24a4a', '#4caf50', '#ffffff', '#000000'];
@@ -146,6 +219,10 @@ if (ui.avatarGenderPicker) {
 
 if (ui.customizeAvatarBtn) {
   ui.customizeAvatarBtn.addEventListener('click', () => {
+    if (!AvatarViewer) {
+      alert("El editor de avatar no está disponible (falló la carga del módulo). Puedes jugar igual.");
+      return;
+    }
     ui.avatarEditorScreen.style.display = 'flex';
     renderAvatarColors();
     updateGenderUI();
@@ -169,37 +246,8 @@ document.querySelectorAll('.closeBtn[data-close="avatarEditorScreen"]').forEach(
 });
 
 // ==========================================
-// EVENTOS MENÚ PRINCIPAL
+// RESTO DEL JUEGO
 // ==========================================
-if (ui.play) {
-  ui.play.addEventListener('click', () => {
-    // Intentar pantalla completa al darle a jugar también
-    toggleFullScreen();
-
-    save.playerName = ui.name.value.trim() || 'Invitado';
-    Storage.save(save);
-
-    document.body.classList.remove('in-menu');
-    ui.menu.style.display = 'none';
-    if (avatarViewer) avatarViewer.stop();
-
-    ui.hud.style.display = 'flex';
-    ui.look.style.display = 'block';
-    
-    document.getElementById('joystick').style.display = 'flex';
-    document.getElementById('mainMenuBtn').style.display = 'flex';
-    
-    const jumpBtn = document.getElementById('jumpBtn');
-    if (jumpBtn) jumpBtn.classList.add('visible');
-    
-    const interactBtn = document.getElementById('interactBtn');
-    if (interactBtn) interactBtn.classList.remove('visible');
-
-    startWorld();
-  });
-}
-
-// ... (El resto del código de Ajustes y startWorld sigue exactamente igual) ...
 function mapSens(v) { return 0.0015 + (v - 1) * (0.0085 / 9); }
 
 function saveCurrentState() {
@@ -214,9 +262,15 @@ function saveCurrentState() {
 }
 
 function startWorld() {
-  world = new World(save);
-  window.world = world; 
-  world.controls.setSensitivity(mapSens(save.sensitivity ?? 4));
+  try {
+    world = new World(save);
+    window.world = world; 
+    world.controls.setSensitivity(mapSens(save.sensitivity ?? 4));
+  } catch (e) {
+    console.error("Error al iniciar el mundo:", e);
+    alert("Hubo un error al cargar el mundo 3D. Revisa la consola (F12).");
+    return;
+  }
 
   const tryPlace = () => {
     const ok = world.confirmPlace();
@@ -307,53 +361,16 @@ function startWorld() {
     if (confirm('¿Salir al menú principal? Se guardará el progreso.')) { saveCurrentState(); location.reload(); }
   });
 
-  world.start(() => {});
+  try {
+    world.start(() => {});
+  } catch (e) {
+    console.error("Error en el bucle del mundo:", e);
+  }
 
   setInterval(() => {
     saveCurrentState();
     ui.status.textContent = `Guardado · ${new Date().toLocaleTimeString()}`;
   }, 5000);
 }
-
-// Configurar ajustes desde el menú principal (si los tienes)
-if (ui.settingsBtn) {
-  ui.settingsBtn.addEventListener('click', () => {
-    ui.settingsName.value = save.playerName;
-    ui.settingsSensitivity.value = save.sensitivity ?? 4;
-    ui.settingsSensValue.textContent = save.sensitivity ?? 4;
-    ui.settingsQuality.value = save.quality ?? 'media';
-    document.getElementById('settingsScreen').style.display = 'flex';
-  });
-}
-
-if (ui.settingsSensitivity) {
-  ui.settingsSensitivity.addEventListener('input', () => {
-    ui.settingsSensValue.textContent = ui.settingsSensitivity.value;
-  });
-}
-
-if (ui.settingsApply) {
-  ui.settingsApply.addEventListener('click', () => {
-    save.playerName = ui.settingsName.value.trim() || 'Invitado';
-    save.sensitivity = Number(ui.settingsSensitivity.value);
-    save.quality = ui.settingsQuality.value;
-    Storage.save(save);
-    if (ui.name) ui.name.value = save.playerName;
-    ui.settingsScreen.style.display = 'none';
-  });
-}
-
-if (ui.settingsReset) {
-  ui.settingsReset.addEventListener('click', () => {
-    if (confirm('¿Borrar todo el progreso?')) {
-      Storage.clear();
-      location.reload();
-    }
-  });
-}
-
-document.querySelectorAll('.closeBtn[data-close="settingsScreen"]').forEach(btn => {
-  btn.addEventListener('click', () => { ui.settingsScreen.style.display = 'none'; });
-});
 
 window.addEventListener('beforeunload', () => { saveCurrentState(); });
