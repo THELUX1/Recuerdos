@@ -1,11 +1,9 @@
 // main.js
-alert("¡El main.js se está ejecutando!");
 import { Storage } from './storage.js';
 import { World } from './world.js';
 import { Shop, updateCoins } from './shop.js';
 
 let AvatarViewer = null;
-// Intentamos cargar el visor del avatar de forma segura
 try {
   const mod = await import('./avatar-viewer.js');
   AvatarViewer = mod.AvatarViewer;
@@ -29,11 +27,24 @@ if (!save.hairColor) save.hairColor = '#1c1917';
 document.body.classList.add('in-menu');
 
 // ==========================================
-// PANTALLA COMPLETA
+// PANTALLA COMPLETA (CORREGIDO)
 // ==========================================
 function toggleFullScreen() {
   if (!document.fullscreenElement && !document.webkitFullscreenElement) {
     const el = document.documentElement;
+    
+    // Escuchar cuando el navegador cambie a pantalla completa para avisarle al mundo
+    const onFullscreenChange = () => {
+      if (world && typeof world._resize === 'function') {
+        world._resize(); 
+      }
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
+    };
+    
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+
     if (el.requestFullscreen) el.requestFullscreen().catch(e => console.log(e));
     else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
     else if (el.msRequestFullscreen) el.msRequestFullscreen();
@@ -93,7 +104,8 @@ if (ui.fullscreenBtn) {
 
 if (ui.play) {
   ui.play.addEventListener('click', () => {
-    toggleFullScreen();
+    toggleFullScreen(); // Intentar pantalla completa al darle a jugar
+
     save.playerName = ui.name.value.trim() || 'Invitado';
     Storage.save(save);
 
@@ -118,6 +130,13 @@ if (ui.play) {
     if (interactBtn) interactBtn.classList.remove('visible');
 
     startWorld();
+
+    // Forzar un redimensionamiento después de que la pantalla se ajuste (evita que se vea cortado)
+    setTimeout(() => {
+      if (world && typeof world._resize === 'function') {
+        world._resize();
+      }
+    }, 500);
   });
 }
 
