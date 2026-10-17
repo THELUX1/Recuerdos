@@ -304,6 +304,12 @@
   <script type="importmap">
   { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
   </script>
-  <script type="module" src="./main.js?v=19"></script>
+  <script type="module">
+  // Prueba cargar el main.js manualmente
+  import('./main.js').catch(err => {
+    alert("Error cargando main.js: " + err.message);
+    console.error(err);
+  });
+  </script>
 </body>
 </html>
