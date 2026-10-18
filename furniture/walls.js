@@ -53,6 +53,11 @@ export function createWallDoor(color, style = 'madera') {
   const dm = _doorStyleMaterials(style);
   const frameMat = mat(dm.frame, 0.8);
 
+  // CORRECCIÓN Z-FIGHTING: Evitar que los marcos peleen con la pared
+  frameMat.polygonOffset = true;
+  frameMat.polygonOffsetFactor = -1;
+  frameMat.polygonOffsetUnits = -1;
+
   const DOOR_W = 1.2;
   const DOOR_H = 2.2;
 
@@ -107,22 +112,14 @@ export function createWallDoor(color, style = 'madera') {
 
   // ============================================================
   // GRUPO BISAGRA: todo lo que gira va acá
-  // El pivote está en el borde izquierdo de la puerta (x = -DOOR_W/2)
-  // Para que el contenido quede bien, desplazamos los hijos +DOOR_W/2 en X
   // ============================================================
   const hinge = new THREE.Group();
-  hinge.position.set(-DOOR_W / 2, 0, 0); // bisagra en el borde izquierdo
+  hinge.position.set(-DOOR_W / 2, 0, 0); 
   g.add(hinge);
 
-  // Offset interno: los paneles se construyen centrados en 0,
-  // pero como el grupo está en -DOOR_W/2, hay que desplazarlos +DOOR_W/2
   const OFFSET_X = DOOR_W / 2;
 
   if (style === 'doble') {
-    // Puerta doble: cada hoja tiene su propia bisagra.
-    // Como el grupo exterior está en -DOOR_W/2, acá hacemos dos subgrupos.
-    // Para simplificar y que gire como una sola, armamos una hoja simple
-    // pero con la estética de doble panel.
     const panelW = DOOR_W / 2 - 0.02;
     for (const sign of [-1, 1]) {
       const panel = new THREE.Mesh(
@@ -172,6 +169,7 @@ export function createWallDoor(color, style = 'madera') {
     const glassMat = new THREE.MeshStandardMaterial({
       color: 0xa8d8e8, roughness: 0.05, metalness: 0.1,
       transparent: true, opacity: 0.45,
+      depthWrite: false // CORRECCIÓN: Evitar bugs de transparencia
     });
     const panel = new THREE.Mesh(
       new THREE.BoxGeometry(DOOR_W - 0.05, DOOR_H - 0.1, 0.05),
@@ -257,7 +255,6 @@ export function createWallDoor(color, style = 'madera') {
     hinge.add(knob);
   }
 
-  // Guardar referencia y estado para la animación desde world.js
   g.userData.puerta = hinge;
   g.userData.puertaAbierta = false;
 
@@ -268,10 +265,17 @@ export function createWallWindow(color, style = 'cruz') {
   const g = new THREE.Group();
   const wallMat = mat(color ?? 0xd8d0c0, 0.9);
   const wm = _windowStyleMaterials(style);
+  
+  // CORRECCIÓN Z-FIGHTING: Aplicar offset al marco de la ventana
   const frameMat = mat(wm.frame, 0.8);
+  frameMat.polygonOffset = true;
+  frameMat.polygonOffsetFactor = -1;
+  frameMat.polygonOffsetUnits = -1;
+
   const glassMat = new THREE.MeshStandardMaterial({
     color: wm.glass, emissive: 0x4466aa, emissiveIntensity: 0.25,
     transparent: true, opacity: 0.5, roughness: 0.05, metalness: 0.1,
+    depthWrite: false // CORRECCIÓN: Crucial para cristales
   });
 
   let WIN_W = 1.6, WIN_H = 1.2, WIN_Y = 1.2;
@@ -378,7 +382,8 @@ export function createWallWindow(color, style = 'cruz') {
     new THREE.BoxGeometry(WIN_W - ft * 2, WIN_H - ft * 2, 0.02),
     glassMat
   );
-  glass.position.set(0, WIN_Y + WIN_H / 2, 0);
+  // CORRECCIÓN: Hundir el cristal para que no choque con el marco
+  glass.position.set(0, WIN_Y + WIN_H / 2, -0.02); 
   g.add(glass);
 
   return g;
