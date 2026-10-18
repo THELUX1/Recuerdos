@@ -75,25 +75,44 @@
       </div>
     </div>
   </div>
-
+  <!-- =====================================================
+     SELECTOR DE CLIMA (Centrado arriba)
+     ===================================================== -->
+<div id="weatherSelector" style="display: none; position: absolute; top: 15px; left: 50%; transform: translateX(-50%); z-index: 50;">
+  <button id="weatherBtn" style="background: rgba(30,41,59,0.9); border: 1px solid rgba(148,163,184,0.3); color: white; padding: 8px 16px; border-radius: 12px; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 8px; font-family: inherit;">
+    <span id="weatherIcon">☀️</span>
+    <span id="weatherLabel">Despejado</span>
+  </button>
+  
+  <div id="weatherMenu" style="display: none; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 8px; background: rgba(15,23,42,0.95); border: 1px solid rgba(148,163,184,0.3); border-radius: 12px; padding: 8px; min-width: 200px; flex-direction: column; gap: 4px; backdrop-filter: blur(10px);">
+    <button class="weather-option" data-weather="despejado">☀️ Despejado</button>
+    <button class="weather-option" data-weather="lluvia_moderada">🌧️ Lluvia moderada</button>
+    <button class="weather-option" data-weather="lluvia_intensa">🌧️ Lluvia intensa</button>
+    <button class="weather-option" data-weather="nieve_moderada">🌨️ Nieve moderada</button>
+    <button class="weather-option" data-weather="nieve_intensa">❄️ Nieve intensa</button>
+    <button class="weather-option" data-weather="tormenta">⛈️ Tormenta eléctrica</button>
+  </div>
+</div>
   <!-- HUD -->
   <div id="hud">
-    <span id="status">Listo</span>
-    <span id="coins">🪙 0</span>
-    <span id="clock">🕐 12:00</span>
-  </div>
+  <span id="status">Listo</span>
+  <span id="coins">🪙 0</span>
+  <span id="clock">🕐 12:00</span>
+  <span id="fps">FPS: --</span>
+</div>
 
   <!-- Botón menú único (arriba derecha) -->
   <button id="mainMenuBtn">☰</button>
 
   <!-- Panel del menú principal (desplegable) -->
   <div id="mainMenu" style="display:none">
-    <button id="shopToggle">🛒 Tienda</button>
-    <button id="inventoryToggle">🎒 Inventario</button>
-    <button id="editToggle">✏️ Editar</button>
-    <button id="settingsToggle">⚙ Ajustes</button>
-    <button id="backToMenu" class="ghost">↩ Salir al menú</button>
-  </div>
+  <button id="shopToggle">🛒 Tienda</button>
+  <button id="inventoryToggle">🎒 Inventario</button>
+  <button id="missionsToggle">🎯 Misiones</button>
+  <button id="editToggle">✏️ Editar</button>
+  <button id="settingsToggle">⚙ Ajustes</button>
+  <button id="backToMenu" class="ghost">↩ Salir al menú</button>
+</div>
 
   <!-- =====================================================
        TIENDA
@@ -138,7 +157,29 @@
       <button id="inventoryCancelBtn" class="ghost">✕</button>
     </div>
   </div>
+<!-- =====================================================
+     MISIONES Y ECONOMÍA
+     ===================================================== -->
+<div id="missionsScreen" class="fullscreen" style="display:none">
+  <header>
+    <h2>🎯 Misiones y Economía</h2>
+    <button class="closeBtn" data-close="missionsScreen">✕</button>
+  </header>
+  
+  <!-- Panel de Renta Pasiva -->
+  <div class="economy-panel" style="background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(250, 204, 21, 0.4); border-radius: 12px; padding: 16px; margin: 0 16px 16px 16px; display: flex; flex-direction: column; gap: 6px;">
+    <h3 style="margin: 0; color: #facc15; font-size: 16px;">🏠 Ingresos por Propiedad</h3>
+    <p style="margin: 0; color: #cbd5e1; font-size: 14px;">Valor de tus muebles: <b id="econPropertyValue" style="color: #60a5fa;">0</b> 🪙</p>
+    <p style="margin: 0; color: #cbd5e1; font-size: 14px;">Renta automática (2 min): <b id="econRentValue" style="color: #4ade80;">0</b> 🪙</p>
+    <p class="hint" style="margin: 4px 0 0 0; font-size: 12px;">Cada 2 minutos recibirás el 2% del valor de tu propiedad. ¡Sigue construyendo para ganar más!</p>
+  </div>
 
+  <p class="hint" style="padding: 0 16px;">Completa misiones para ganar monedas extra.</p>
+  <div class="shop-content" id="missionsGrid"></div>
+  <div class="shop-footer">
+    <span>🪙 Recompensas totales: <b id="missionsTotal">0</b></span>
+  </div>
+</div>
   <!-- =====================================================
        VENDER
        ===================================================== -->

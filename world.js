@@ -11,7 +11,7 @@ export class World {
 
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, powerPreference: "high-performance" });
     
-    const maxPixelRatio = save.quality === 'alta' ? 1.5 : 1;
+    const maxPixelRatio = save.quality === 'alta' ? 1.5 : (save.quality === 'media' ? 0.9 : 1);
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, maxPixelRatio));
     
     this.renderer.setSize(innerWidth, innerHeight);
@@ -59,6 +59,7 @@ export class World {
     this.onPlaceRequest = null;
     this.onDeleteRequest = null;
     this.onTVSave = null;
+    this.onFurniturePlaced = null;
 
     // Medios
     this.tvTarget = null;
@@ -70,10 +71,14 @@ export class World {
     this._tvSaveTimer = 0;
     this._lastShadowUpdate = 0;
 
+    // FPS
+    this._fpsFrames = 0;
+    this._fpsElapsed = 0;
+
     this.audioMaxDist = 12;
     this.audioMinDist = 2;
 
-    // Viento para el pasto (muy suave)
+    // Viento para el pasto
     this.windTime = 0;
     this.windSpeed = 0.5;
     this.windAmplitude = 0.05;
@@ -92,7 +97,7 @@ export class World {
     this._walkPhase = 0;
 
     /* ============================================================
-       ESTADO DE INTERACCIÓN (SENTARSE / ACOSTARSE)
+       ESTADO DE INTERACCIÓN
        ============================================================ */
     this.isSeated = false;
     this.isSleeping = false;
@@ -156,14 +161,14 @@ export class World {
     ]);
 
     this._outdoorAllowed = new Set([
-  'luz_aplique',
-  'parche_pasto',
-  'flores',
-  'arbusto',
-  'arbol_chico',
-  'arbol_grande',
-  'planta_maceta',
-]);
+      'luz_aplique',
+      'parche_pasto',
+      'flores',
+      'arbusto',
+      'arbol_chico',
+      'arbol_grande',
+      'planta_maceta',
+    ]);
 
     this._wallMountHeight = {
       luz_plafon:     2.85,
@@ -237,7 +242,23 @@ export class World {
     this._windSpeed = 1.2;
     this._cloudWaveTimer = 0;
 
+    // SISTEMA DE CLIMA
+    this.currentWeather = 'despejado';
+    this.targetWeather = 'despejado';
+    this.weatherIntensity = 0;
+    this.weatherTransitionSpeed = 0.2;
+    this._lightningTimer = 0;
+    this._stormFlashActive = false;
+
     this._buildSky();
+    this._initWeather();
+    this._prefillClouds(); // <-- NUEVO: Nubes ya presentes al iniciar
+    
+    if (this.save.weather && this.save.weather !== 'despejado') {
+      this.targetWeather = this.save.weather;
+      this.weatherIntensity = 1;
+    }
+
     this._lights();
     this._buildNeighborhood();
     this._loadFurniture();
@@ -256,6 +277,276 @@ export class World {
     addEventListener('resize', () => this._resize());
   }
 
+   _initWeather() {
+  // === LLUVIA ===
+  const rainCount = 2000;
+  const rainGeo = new THREE.BufferGeometry();
+  const rainPos = new Float32Array(rainCount * 3);
+  this._rainVelocities = new Float32Array(rainCount);
+  
+  for (let i = 0; i < rainCount; i++) {
+    rainPos[i * 3] = (Math.random() - 0.5) * 80;
+    rainPos[i * 3 + 1] = Math.random() * 30;
+    rainPos[i * 3 + 2] = (Math.random() - 0.5) * 80;
+    this._rainVelocities[i] = 0.3 + Math.random() * 0.4;
+  }
+  rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
+  
+  const rainMat = new THREE.PointsMaterial({
+    color: 0xaaccff, size: 0.12, transparent: true, opacity: 0, depthWrite: false
+  });
+  this.rainSystem = new THREE.Points(rainGeo, rainMat);
+  this.rainSystem.visible = false;
+  this.rainSystem.position.set(0, 0, 0);
+  this.rainSystem.frustumCulled = false;
+  this.scene.add(this.rainSystem);
+
+  // === NIEVE ===
+  const snowCount = 1200;
+  const snowGeo = new THREE.BufferGeometry();
+  const snowPos = new Float32Array(snowCount * 3);
+  
+  for (let i = 0; i < snowCount; i++) {
+    snowPos[i * 3] = (Math.random() - 0.5) * 80;
+    snowPos[i * 3 + 1] = Math.random() * 30;
+    snowPos[i * 3 + 2] = (Math.random() - 0.5) * 80;
+  }
+  snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPos, 3));
+  
+  const snowMat = new THREE.PointsMaterial({
+    color: 0xffffff, size: 0.28, transparent: true, opacity: 0, depthWrite: false
+  });
+  this.snowSystem = new THREE.Points(snowGeo, snowMat);
+  this.snowSystem.visible = false;
+  this.snowSystem.position.set(0, 0, 0);
+  this.snowSystem.frustumCulled = false;
+  this.scene.add(this.snowSystem);
+
+  this._lightningTimer = 0;
+  this._stormFlashActive = false;
+  this._cloudBoosted = false;
+  
+  // === RAYOS ===
+  this._lightningBolts = [];
+  this._lightningCooldown = 5;
+}
+
+setWeather(type) {
+  this.targetWeather = type;
+}
+
+_updateWeather(dt) {
+  const targetIntensity = this.targetWeather === 'despejado' ? 0 : 1;
+  if (this.weatherIntensity < targetIntensity) {
+    this.weatherIntensity = Math.min(targetIntensity, this.weatherIntensity + this.weatherTransitionSpeed * dt);
+  } else if (this.weatherIntensity > targetIntensity) {
+    this.weatherIntensity = Math.max(targetIntensity, this.weatherIntensity - this.weatherTransitionSpeed * dt);
+  }
+
+  const isRain = this.targetWeather.includes('lluvia') || this.targetWeather === 'tormenta';
+  const isSnow = this.targetWeather.includes('nieve');
+  const isStorm = this.targetWeather === 'tormenta';
+  const isIntense = this.targetWeather === 'lluvia_intensa' || this.targetWeather === 'nieve_intensa' || isStorm;
+
+  // --- VISIBILIDAD ---
+  if (isRain) {
+    this.rainSystem.visible = this.weatherIntensity > 0.01;
+    this.rainSystem.material.opacity = this.weatherIntensity * (isIntense ? 0.85 : 0.55);
+    this.rainSystem.material.size = isIntense ? 0.18 : 0.12;
+  } else if (this.weatherIntensity <= 0.01) {
+    this.rainSystem.visible = false;
+  }
+
+  if (isSnow) {
+    this.snowSystem.visible = this.weatherIntensity > 0.01;
+    this.snowSystem.material.opacity = this.weatherIntensity * (isIntense ? 0.95 : 0.75);
+    this.snowSystem.material.size = isIntense ? 0.38 : 0.28;
+  } else if (this.weatherIntensity <= 0.01) {
+    this.snowSystem.visible = false;
+  }
+
+  // --- MOVIMIENTO Y COLISIÓN ---
+  const raycaster = new THREE.Raycaster();
+  const rayDir = new THREE.Vector3(0, -1, 0);
+  const roofMeshes = this.placed
+    .filter(p => p.type === 'techo_basico')
+    .map(p => p.obj);
+
+  if (this.rainSystem.visible) {
+    const pos = this.rainSystem.geometry.attributes.position.array;
+    const speedMult = isIntense ? 90 : 60;
+    
+    for (let i = 0; i < this._rainVelocities.length; i++) {
+      pos[i * 3 + 1] -= this._rainVelocities[i] * speedMult * dt;
+      
+      const dx = pos[i * 3] - this.camera.position.x;
+      const dz = pos[i * 3 + 2] - this.camera.position.z;
+      const distToPlayer = Math.hypot(dx, dz);
+
+      if (distToPlayer < 15 && pos[i * 3 + 1] < 5.0) {
+        raycaster.set(new THREE.Vector3(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]), rayDir);
+        const hits = raycaster.intersectObjects(roofMeshes, true);
+        
+        if (hits.length > 0) {
+          pos[i * 3 + 1] = 30;
+          pos[i * 3] = (Math.random() - 0.5) * 80;
+          pos[i * 3 + 2] = (Math.random() - 0.5) * 80;
+          continue;
+        }
+      }
+
+      if (pos[i * 3 + 1] < 0) {
+        pos[i * 3 + 1] = 30;
+        pos[i * 3] = (Math.random() - 0.5) * 80;
+        pos[i * 3 + 2] = (Math.random() - 0.5) * 80;
+      }
+    }
+    this.rainSystem.geometry.attributes.position.needsUpdate = true;
+  }
+
+  if (this.snowSystem.visible) {
+    const pos = this.snowSystem.geometry.attributes.position.array;
+    const time = performance.now() * 0.001;
+    const fallSpeed = isIntense ? 4 : 2.5;
+
+    for (let i = 0; i < pos.length / 3; i++) {
+      pos[i * 3 + 1] -= fallSpeed * dt;
+      pos[i * 3] += Math.sin(time + i * 0.5) * 0.6 * dt;
+
+      const dx = pos[i * 3] - this.camera.position.x;
+      const dz = pos[i * 3 + 2] - this.camera.position.z;
+      const distToPlayer = Math.hypot(dx, dz);
+
+      if (distToPlayer < 15 && pos[i * 3 + 1] < 5.0) {
+        raycaster.set(new THREE.Vector3(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]), rayDir);
+        const hits = raycaster.intersectObjects(roofMeshes, true);
+        
+        if (hits.length > 0) {
+          pos[i * 3 + 1] = 30;
+          pos[i * 3] = (Math.random() - 0.5) * 80;
+          pos[i * 3 + 2] = (Math.random() - 0.5) * 80;
+          continue;
+        }
+      }
+
+      if (pos[i * 3 + 1] < 0) {
+        pos[i * 3 + 1] = 30;
+        pos[i * 3] = (Math.random() - 0.5) * 80;
+        pos[i * 3 + 2] = (Math.random() - 0.5) * 80;
+      }
+    }
+    this.snowSystem.geometry.attributes.position.needsUpdate = true;
+  }
+
+  // --- TORMENTA: DESTELLO GLOBAL Y RAYOS VISUALES ---
+  if (isStorm && this.weatherIntensity > 0.5) {
+    this._lightningTimer -= dt;
+    this._lightningCooldown -= dt;
+    
+    // Destello global (relámpago de fondo)
+    if (this._lightningTimer <= 0) {
+      this._lightningTimer = 2 + Math.random() * 5;
+      this._stormFlashActive = true;
+      setTimeout(() => { this._stormFlashActive = false; }, 120);
+    }
+    
+    // Rayo visual (tubo que cae)
+    if (this._lightningCooldown <= 0) {
+      this._lightningCooldown = 4 + Math.random() * 8;
+      
+      const boltGroup = new THREE.Group();
+      const startX = (Math.random() - 0.5) * 80;
+      const startZ = (Math.random() - 0.5) * 80;
+      const endX = startX + (Math.random() - 0.5) * 10;
+      const endZ = startZ + (Math.random() - 0.5) * 10;
+      
+      const points = [];
+      const segments = 8;
+      for (let i = 0; i <= segments; i++) {
+        const t = i / segments;
+        const jitterX = (Math.random() - 0.5) * 2 * (1 - Math.abs(t - 0.5) * 2);
+        const jitterZ = (Math.random() - 0.5) * 2 * (1 - Math.abs(t - 0.5) * 2);
+        points.push(new THREE.Vector3(
+          startX + (endX - startX) * t + jitterX,
+          30 - t * 30,
+          startZ + (endZ - startZ) * t + jitterZ
+        ));
+      }
+      
+      const curve = new THREE.CatmullRomCurve3(points);
+      const tubeGeo = new THREE.TubeGeometry(curve, 20, 0.15, 4, false);
+      const boltMat = new THREE.MeshBasicMaterial({ 
+        color: 0xffffcc, 
+        transparent: true, 
+        opacity: 1,
+        blending: THREE.AdditiveBlending
+      });
+      const boltMesh = new THREE.Mesh(tubeGeo, boltMat);
+      boltGroup.add(boltMesh);
+      
+      const boltLight = new THREE.PointLight(0xffffcc, 50, 40, 1.5);
+      boltLight.position.set(endX, 10, endZ);
+      boltGroup.add(boltLight);
+      
+      this.scene.add(boltGroup);
+      this._lightningBolts.push({ 
+        group: boltGroup, 
+        light: boltLight, 
+        life: 0.3
+      });
+    }
+  }
+
+  // Actualizar rayos existentes (desvanecerse)
+  for (let i = this._lightningBolts.length - 1; i >= 0; i--) {
+    const bolt = this._lightningBolts[i];
+    bolt.life -= dt;
+    bolt.light.intensity = Math.max(0, bolt.life * 150);
+    bolt.group.traverse(o => {
+      if (o.isMesh && o.material) {
+        o.material.opacity = Math.max(0, bolt.life * 3.33);
+      }
+    });
+    if (bolt.life <= 0) {
+      this.scene.remove(bolt.group);
+      this._lightningBolts.splice(i, 1);
+    }
+  }
+
+  // --- OCULTAR EL SOL CON MAL CLIMA ---
+  if (this.sunMesh) {
+    const sunTargetOpacity = this.weatherIntensity > 0.1 ? 0 : 1;
+    const currentSunOpacity = parseFloat(this.sunMesh.material.opacity) || 0;
+    this.sunMesh.material.opacity = currentSunOpacity + (sunTargetOpacity - currentSunOpacity) * Math.min(1, 2 * dt);
+  }
+
+  // --- GENERAR NUBES RÁPIDO CON MAL CLIMA ---
+  if (this.weatherIntensity > 0.1 && !this._cloudBoosted) {
+    this._cloudBoosted = true;
+    for (let i = 0; i < 50; i++) {
+      setTimeout(() => {
+        const cloud = this._createCloud();
+        const x = (Math.random() - 0.5) * 200;
+        const z = (Math.random() - 0.5) * 200;
+        const y = 40 + Math.random() * 25;
+        cloud.position.set(x, y, z);
+        
+        const vx = Math.cos(this._windAngle) * this._windSpeed * 2;
+        const vz = Math.sin(this._windAngle) * this._windSpeed * 2;
+        cloud.userData.vx = vx;
+        cloud.userData.vz = vz;
+        
+        const scale = 1.2 + Math.random() * 1.0;
+        cloud.scale.set(scale, scale, scale);
+        
+        this.scene.add(cloud);
+        this.clouds.push(cloud);
+      }, i * 30);
+    }
+  } else if (this.weatherIntensity <= 0.1) {
+    this._cloudBoosted = false;
+  }
+}
   _initEditPanelEvents() {
     const contentBtn = document.getElementById('editContent');
     const moveBtn = document.getElementById('editMove');
@@ -610,7 +901,30 @@ export class World {
     cloud.userData.vx = vx; cloud.userData.vz = vz;
     this.scene.add(cloud); this.clouds.push(cloud);
   }
-
+_prefillClouds() {
+  // Genera muchas nubes esparcidas por un área MUY grande (200x200)
+  for (let i = 0; i < 25; i++) {
+    const cloud = this._createCloud();
+    // Distribución uniforme en un área de 200x200
+    const x = (Math.random() - 0.5) * 200;
+    const z = (Math.random() - 0.5) * 200;
+    const y = 45 + Math.random() * 30; // Altura variada para que no se vean planas
+    
+    cloud.position.set(x, y, z);
+    
+    const vx = Math.cos(this._windAngle) * this._windSpeed;
+    const vz = Math.sin(this._windAngle) * this._windSpeed;
+    cloud.userData.vx = vx;
+    cloud.userData.vz = vz;
+    
+    // Escala aleatoria para más variedad
+    const scale = 0.8 + Math.random() * 0.8;
+    cloud.scale.set(scale, scale, scale);
+    
+    this.scene.add(cloud);
+    this.clouds.push(cloud);
+  }
+}
   _updateClouds(dt) {
     const half = 180;
     const vx = Math.cos(this._windAngle) * this._windSpeed;
@@ -648,7 +962,8 @@ export class World {
       this.sunLight.shadow.camera.left = -d; this.sunLight.shadow.camera.right = d;
       this.sunLight.shadow.camera.top = d; this.sunLight.shadow.camera.bottom = -d;
       this.sunLight.shadow.camera.near = 1; this.sunLight.shadow.camera.far = 200;
-      this.sunLight.shadow.bias = -0.0005; this.sunLight.shadow.normalBias = 0.05; 
+      this.sunLight.shadow.bias = -0.001; 
+      this.sunLight.shadow.normalBias = 0.08; 
     }
     this.scene.add(this.sunLight);
 
@@ -699,7 +1014,7 @@ export class World {
 
     const grass = new THREE.Mesh(new THREE.PlaneGeometry(HALF * 2, HALF * 2), grassMat);
     grass.rotation.x = -Math.PI / 2;
-    grass.receiveShadow = true;
+    grass.receiveShadow = false;
     this.scene.add(grass);
     this.grass = grass;
 
@@ -741,22 +1056,43 @@ export class World {
       );
       pad.rotation.x = -Math.PI / 2; pad.position.set(plot.cx, 0.04, plot.cz); pad.receiveShadow = true;
       this.scene.add(pad); plot.half = this.PLOT_SIZE / 2;
+      plot.padMesh = pad; 
     }
 
     this.streetLamps = [];
+    
+    const glowCanvas = document.createElement('canvas');
+    glowCanvas.width = 64; glowCanvas.height = 64;
+    const glowCtx = glowCanvas.getContext('2d');
+    const glowGrad = glowCtx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    glowGrad.addColorStop(0, 'rgba(255, 220, 130, 0.8)');
+    glowGrad.addColorStop(0.4, 'rgba(255, 200, 100, 0.2)');
+    glowGrad.addColorStop(1, 'rgba(255, 180, 80, 0)');
+    glowCtx.fillStyle = glowGrad;
+    glowCtx.fillRect(0, 0, 64, 64);
+    const glowTexture = new THREE.CanvasTexture(glowCanvas);
+    
+    const fakeLightMat = new THREE.MeshBasicMaterial({ 
+      map: glowTexture, 
+      transparent: true, 
+      depthWrite: false, 
+      blending: THREE.AdditiveBlending 
+    });
+
     for (const [x, z] of [[-5, -5], [5, -5], [-5, 5], [5, 5]]) {
       this._addBox(0.15, 3.2, 0.15, x, 1.6, z, 0x333333);
       const bulbMat = new THREE.MeshStandardMaterial({ color: 0xfff2c0, emissive: 0xffe4a0, emissiveIntensity: 3.0, roughness: 0.3 });
       const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.28, 14, 12), bulbMat);
-      bulb.position.set(x, 3.4, z); this.scene.add(bulb);
+      bulb.position.set(x, 3.4, z); 
+      this.scene.add(bulb);
       this._addBox(0.5, 0.15, 0.5, x, 3.65, z, 0x222222);
-      const lamp = new THREE.PointLight(0xffd88a, 5.0, 25, 1.2);
-      lamp.position.set(x, 3.0, z); 
-      lamp.castShadow = true;
-      lamp.shadow.mapSize.width = 256; lamp.shadow.mapSize.height = 256;
-      lamp.shadow.camera.far = 25; lamp.shadow.bias = -0.005;
-      this.scene.add(lamp);
-      this.streetLamps.push({ light: lamp, bulb });
+      
+      const fakeHalo = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), fakeLightMat);
+      fakeHalo.rotation.x = -Math.PI / 2;
+      fakeHalo.position.set(x, 0.06, z);
+      this.scene.add(fakeHalo);
+      
+      this.streetLamps.push({ light: null, bulb: bulb, halo: fakeHalo });
     }
   }
 
@@ -773,7 +1109,7 @@ export class World {
     this.sunLight.position.set(sunX, Math.max(sunY, 1), sunZ);
 
     this._lastShadowUpdate++;
-    if (this._lastShadowUpdate >= 30) {
+    if (this._lastShadowUpdate >= 90) {
       this._lastShadowUpdate = 0;
       if (this.renderer && this.renderer.shadowMap) this.renderer.shadowMap.needsUpdate = true;
     }
@@ -803,14 +1139,11 @@ export class World {
     }
 
     if (this.streetLamps) {
-      let lucesCambiaron = false;
-      const targetIntensity = sunHeight < 0.1 ? 5.0 : 0;
+      const isNightLamp = sunHeight < 0.1;
       for (const l of this.streetLamps) {
-        if ((l.light.intensity === 0 && targetIntensity > 0) || (l.light.intensity > 0 && targetIntensity === 0)) lucesCambiaron = true;
-        l.light.intensity = targetIntensity; 
-        l.bulb.material.emissiveIntensity = targetIntensity > 0 ? 3.0 : 0;
+        if (l.bulb) l.bulb.material.emissiveIntensity = isNightLamp ? 3.0 : 0;
+        if (l.halo) l.halo.visible = isNightLamp;
       }
-      if (lucesCambiaron && this.renderer.shadowMap) this.renderer.shadowMap.needsUpdate = true;
     }
 
     const dayTop = new THREE.Color(0x2d7ad6); const dayBottom = new THREE.Color(0xcfe4f5);
@@ -839,20 +1172,29 @@ export class World {
     this.moonMesh.material.opacity = Math.max(0, Math.min(1, (moonY + 15) / 30));
     this.starMat.opacity = Math.min(1, Math.max(0, -sunHeight * 2));
 
-    for (const c of this.clouds) {
-      c.traverse(o => {
-        if (o.isMesh && o.material && o.material.color) {
-          const baseWhite = new THREE.Color(1, 1, 1); const duskTint = new THREE.Color(1, 0.7, 0.5);
-          const nightTint = new THREE.Color(0.35, 0.4, 0.55); let target;
-          if (isDay && sunHeight > 0.3) target = baseWhite;
-          else if (sunHeight > -0.1) {
-            const t = Math.max(0, Math.min(1, (sunHeight + 0.1) / 0.4));
-            target = nightTint.clone().lerp(duskTint, t);
-          } else target = nightTint;
-          o.material.color.copy(target);
-        }
-      });
+    // --- COLOR DE LAS NUBES SEGÚN CLIMA Y HORA ---
+const weatherDarkness = this.weatherIntensity;
+for (const c of this.clouds) {
+  c.traverse(o => {
+    if (o.isMesh && o.material && o.material.color) {
+      const baseWhite = new THREE.Color(1, 1, 1); 
+      const duskTint = new THREE.Color(1, 0.7, 0.5);
+      const nightTint = new THREE.Color(0.35, 0.4, 0.55); 
+      const stormTint = new THREE.Color(0.15, 0.17, 0.22); // Nubes de tormenta MUY oscuras
+      
+      let target;
+      if (isDay && sunHeight > 0.3) target = baseWhite.clone();
+      else if (sunHeight > -0.1) {
+        const t = Math.max(0, Math.min(1, (sunHeight + 0.1) / 0.4));
+        target = nightTint.clone().lerp(duskTint, t);
+      } else target = nightTint.clone();
+      
+      // Mezclar con el color de tormenta
+      target.lerp(stormTint, weatherDarkness * 0.9);
+      o.material.color.copy(target);
     }
+  });
+}
 
     const clockEl = document.getElementById('clock');
     if (clockEl) {
@@ -860,7 +1202,27 @@ export class World {
       const mins = Math.floor((this.dayTime * 24 - hours) * 60);
       clockEl.textContent = `🕐 ${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
     }
+
+      // --- CLIMA: OSCURECER Y PONER CIELO GRIS ---
+  const badWeather = this.weatherIntensity;
+  if (badWeather > 0.01) {
+    // Gris de tormenta
+    const stormGreyTop = new THREE.Color(0x4a5568);
+    const stormGreyBottom = new THREE.Color(0x718096);
+    
+    this.skyMat.uniforms.topColor.value.lerp(stormGreyTop, badWeather * 0.8);
+    this.skyMat.uniforms.bottomColor.value.lerp(stormGreyBottom, badWeather * 0.8);
+
+    // Apagar luces progresivamente
+    if (this.sunLight) this.sunLight.intensity *= (1 - badWeather * 0.7);
+    if (this.hemi) this.hemi.intensity *= (1 - badWeather * 0.5);
   }
+
+  // Destello de relámpago
+  if (this._stormFlashActive && this.sunLight) {
+    this.sunLight.intensity += 4.0;
+  }
+}
 
   _loadFurniture() {
     for (const item of (this.save.placedFurniture ?? [])) {
@@ -870,6 +1232,17 @@ export class World {
       place(obj, item.x, y, item.z, item.rotY ?? 0);
       obj.position.y = y;
       this.scene.add(obj);
+
+      // Parche Z-Fighting
+      if (item.type.startsWith('muro')) {
+        obj.traverse(child => {
+          if (child.isMesh && child.material) {
+            child.material.polygonOffset = true;
+            child.material.polygonOffsetFactor = -1.0;
+            child.material.polygonOffsetUnits = -1.0;
+          }
+        });
+      }
 
       const rec = {
         type: item.type, obj, x: item.x, y: y, z: item.z, rotY: item.rotY ?? 0,
@@ -984,10 +1357,23 @@ export class World {
   _applyPlotFloor(idx, type, save = true, color = null) {
     const plot = this.plots[idx];
     if (!plot) return;
+
     if (this._floorMeshes[idx]) {
       this.scene.remove(this._floorMeshes[idx]);
       this._floorMeshes[idx] = null;
     }
+
+    if (!type) {
+      if (plot.padMesh) plot.padMesh.visible = true;
+      delete this._plotFloors[idx];
+      if (save) {
+        if (this.save.plotFloors) delete this.save.plotFloors[idx];
+        if (typeof this.onTVSave === 'function') this.onTVSave();
+      }
+      this.renderer.shadowMap.needsUpdate = true;
+      return;
+    }
+
     const floorObj = createFloor(type, color);
     if (!floorObj) return;
 
@@ -995,6 +1381,13 @@ export class World {
       if (child.isMesh && child.material) {
         child.material.roughness = 1.0;
         child.material.metalness = 0.0;
+        if (child.material.map) {
+          child.material.map.anisotropy = 1;
+          child.material.map.minFilter = THREE.LinearFilter;
+          child.material.map.generateMipmaps = false;
+          child.material.map.needsUpdate = true;
+        }
+        child.material.needsUpdate = true;
       }
     });
 
@@ -1002,6 +1395,8 @@ export class World {
     this.scene.add(floorObj);
     this._floorMeshes[idx] = floorObj;
     this._plotFloors[idx] = type;
+
+    if (plot.padMesh) plot.padMesh.visible = false;
 
     if (save) {
       this.save.plotFloors = this.save.plotFloors ?? {};
@@ -1144,6 +1539,7 @@ export class World {
       this._applyPlotFloor(idx, this.selectedId, true, this.selectedColor ?? null);
       this._notifyTV(`🟫 Piso cambiado en terreno ${idx + 1}`);
       this.renderer.shadowMap.needsUpdate = true;
+      if (typeof this.onFurniturePlaced === 'function') this.onFurniturePlaced(this.selectedId);
       return true;
     }
 
@@ -1185,6 +1581,18 @@ export class World {
     }
 
     this.scene.add(obj);
+
+    // Parche Z-Fighting en muros nuevos
+    if (id.startsWith('muro')) {
+      obj.traverse(child => {
+        if (child.isMesh && child.material) {
+          child.material.polygonOffset = true;
+          child.material.polygonOffsetFactor = -1.0;
+          child.material.polygonOffsetUnits = -1.0;
+        }
+      });
+    }
+
     this.placed.push({
       type: id, obj, x: gx, y: obj.position.y, z: gz, rotY,
       radius: this._radiusFor(id), color: this.selectedColor,
@@ -1197,6 +1605,9 @@ export class World {
     });
 
     this.renderer.shadowMap.needsUpdate = true;
+
+    if (typeof this.onFurniturePlaced === 'function') this.onFurniturePlaced(id);
+
     return true;
   }
 
@@ -1226,7 +1637,6 @@ export class World {
 
     if (isStackable) return true;
 
-    // Decorativos de suelo: no colisionan entre sí
     const isGroundDecor = id === 'parche_pasto' || id === 'flores';
 
     const myY = this._wallMountHeight[id] ?? 0;
@@ -2008,7 +2418,6 @@ export class World {
   }
 
   _animateGrass() {
-    // Solo en calidad alta. En media, el pasto queda estático.
     if (this.save.quality !== 'alta') return;
 
     const dummy = new THREE.Object3D();
@@ -2026,11 +2435,9 @@ export class World {
 
         const basePos = new THREE.Vector3().setFromMatrixPosition(baseMatrix);
 
-        // Fase espacial para onda continua
         const phase = basePos.x * 1.1 + basePos.z * 1.1;
         const t = this.windTime + phase;
 
-        // Inclinación MUY leve
         const windX = Math.sin(t) * this.windAmplitude;
         const windZ = Math.cos(t * 0.7) * this.windAmplitude * 0.5;
 
@@ -2052,6 +2459,7 @@ export class World {
       this.windTime += dt * this.windSpeed;
 
       this._updateDayCycle(dt);
+      this._updateWeather(dt);
       this._updateClouds(dt);
       this._updateTVAudioVolume();
       this._updateDoors(dt);
@@ -2106,6 +2514,17 @@ export class World {
         if (this._lastHighlight) this.highlightTarget(this._lastHighlight);
       }
       if (onTick) onTick(this, dt);
+
+      this._fpsFrames++;
+      this._fpsElapsed += dt;
+      if (this._fpsElapsed >= 0.5) {
+        const fps = Math.round(this._fpsFrames / this._fpsElapsed);
+        const el = document.getElementById('fps');
+        if (el) el.textContent = `FPS: ${fps}`;
+        this._fpsFrames = 0;
+        this._fpsElapsed = 0;
+      }
+
       this.renderer.render(this.scene, this.camera);
       requestAnimationFrame(step);
     };
@@ -2119,6 +2538,7 @@ export class World {
       placedFurniture: this.save.placedFurniture,
       dayTime: this.dayTime,
       plotFloors: this.save.plotFloors ?? {},
+      weather: this.targetWeather,
     };
   }
 }

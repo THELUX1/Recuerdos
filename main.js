@@ -1,7 +1,7 @@
 // main.js
 import { Storage } from './storage.js';
 import { World } from './world.js';
-import { Shop, updateCoins } from './shop.js';
+import { Shop, updateCoins, SHOP_ITEMS } from './shop.js';
 
 let AvatarViewer = null;
 try {
@@ -18,6 +18,7 @@ window.Storage = Storage;
 let world = null;
 let shop = null;
 let avatarViewer = null;
+let rentInterval = null;
 
 if (!save.playerColor) save.playerColor = '#4a90e2';
 if (!save.playerGender) save.playerGender = 'm';
@@ -88,6 +89,11 @@ const ui = {
   editPanel: document.getElementById('editPanel'),
   moveBar: document.getElementById('moveBar'),
   settingsToggle: document.getElementById('settingsToggle'),
+  // === MISIONES ===
+  missionsToggle: document.getElementById('missionsToggle'),
+  missionsScreen: document.getElementById('missionsScreen'),
+  missionsGrid: document.getElementById('missionsGrid'),
+  missionsTotal: document.getElementById('missionsTotal'),
 };
 
 if (ui.name) ui.name.value = save.playerName ?? 'Invitado';
@@ -107,7 +113,6 @@ function showCustomConfirm(title, msg) {
     confirmMsg.textContent = msg;
     confirmModal.style.display = 'flex';
 
-    // Limpiamos eventos anteriores clonando los botones
     const newAccept = confirmAcceptBtn.cloneNode(true);
     const newCancel = confirmCancelBtn.cloneNode(true);
     confirmAcceptBtn.replaceWith(newAccept);
@@ -152,6 +157,10 @@ if (ui.play) {
     const mainMenuBtn = document.getElementById('mainMenuBtn');
     if (mainMenuBtn) mainMenuBtn.style.display = 'flex';
     
+    // Mostrar el selector de clima al iniciar la partida
+    const weatherSelector = document.getElementById('weatherSelector');
+    if (weatherSelector) weatherSelector.style.display = 'block';
+
     const jumpBtn = document.getElementById('jumpBtn');
     if (jumpBtn) jumpBtn.classList.add('visible');
     
@@ -295,6 +304,150 @@ document.querySelectorAll('.closeBtn[data-close="avatarEditorScreen"]').forEach(
 });
 
 // ==========================================
+// SISTEMA DE MISIONES Y ECONOMÍA
+// ==========================================
+function getMissions() {
+  if (!Array.isArray(save.missions)) save.missions = Storage.default().missions;
+  return save.missions;
+}
+
+function renderMissions() {
+  if (!ui.missionsGrid) return;
+  const missions = getMissions();
+  ui.missionsGrid.innerHTML = '';
+
+  if (missions.length === 0) {
+    ui.missionsGrid.innerHTML = '<p class="hint">No hay misiones disponibles.</p>';
+    return;
+  }
+
+  let totalReward = 0;
+
+  missions.forEach(m => {
+    const clamped = Math.min(m.progress, m.target);
+    const pct = m.target > 0 ? Math.min(100, (clamped / m.target) * 100) : 0;
+    if (m.done) totalReward += m.reward;
+
+    const card = document.createElement('div');
+    card.className = 'mission-card' + (m.done ? ' done' : '');
+    card.innerHTML = `
+      <div class="mission-head">
+        <span class="mission-title">${m.done ? '✅ ' : ''}${m.title}</span>
+        <span class="mission-reward">+${m.reward} 🪙</span>
+      </div>
+      <div class="mission-progress-track">
+        <div class="mission-progress-fill" style="width:${pct}%"></div>
+      </div>
+      <div class="mission-progress-label">
+        ${m.done ? '<span class="mission-done-badge">✔ Completada</span>' : `${clamped} / ${m.target}`}
+      </div>
+    `;
+    ui.missionsGrid.appendChild(card);
+  });
+
+  if (ui.missionsTotal) ui.missionsTotal.textContent = totalReward;
+}
+
+function matchesMission(match, id) {
+  if (!match || !id) return false;
+  if (Array.isArray(match)) return match.some(m => id.startsWith(m));
+  return id.startsWith(match);
+}
+
+function updateMissionsOnPlace(id) {
+  const missions = getMissions();
+  let changed = false;
+  let gained = 0;
+
+  for (const m of missions) {
+    if (m.done) continue;
+    if (!matchesMission(m.match, id)) continue;
+
+    m.progress = Math.min(m.target, (m.progress || 0) + 1);
+    changed = true;
+
+    if (m.progress >= m.target) {
+      m.done = true;
+      gained += m.reward;
+      if (typeof world !== 'undefined' && world && typeof world._notifyTV === 'function') {
+        world._notifyTV(`🎯 ¡Misión completada! +${m.reward} 🪙`);
+      }
+    }
+  }
+
+  if (gained > 0) {
+    save.coins = (save.coins ?? 0) + gained;
+    if (typeof updateCoins === 'function') updateCoins(save.coins);
+    const shopCoinsEl = document.getElementById('shopCoins');
+    if (shopCoinsEl) shopCoinsEl.textContent = save.coins;
+  }
+
+  if (changed) {
+    Storage.save(save);
+    renderMissions();
+  }
+}
+
+function calcularValorPropiedad() {
+  let total = 0;
+  const muebles = save.placedFurniture || [];
+  for (const m of muebles) {
+    const item = SHOP_ITEMS.find(i => i.id === m.type);
+    if (item) total += item.price;
+  }
+  return total;
+}
+
+function actualizarPanelEconomia() {
+  const valEl = document.getElementById('econPropertyValue');
+  const rentEl = document.getElementById('econRentValue');
+  if (!valEl || !rentEl) return;
+
+  const total = calcularValorPropiedad();
+  const renta = Math.max(5, Math.floor(total * 0.02));
+  
+  valEl.textContent = total;
+  rentEl.textContent = renta;
+}
+
+function procesarRenta() {
+  if (!world) return; 
+  
+  const valorTotal = calcularValorPropiedad();
+  const renta = Math.max(5, Math.floor(valorTotal * 0.02));
+  
+  save.coins = (save.coins ?? 0) + renta;
+  updateCoins(save.coins);
+  Storage.save(save);
+
+  if (world && typeof world._notifyTV === 'function') {
+    world._notifyTV(`🏠 Renta cobrada: +${renta} 🪙`);
+  }
+  
+  if (ui.missionsScreen && ui.missionsScreen.style.display === 'flex') {
+    actualizarPanelEconomia();
+  }
+}
+
+// ==========================================
+// EVENTOS DE MISIONES
+// ==========================================
+if (ui.missionsToggle) {
+  ui.missionsToggle.addEventListener('click', () => {
+    document.getElementById('mainMenu').style.display = 'none';
+    renderMissions();
+    actualizarPanelEconomia();
+    ui.missionsScreen.style.display = 'flex';
+  });
+}
+
+document.querySelectorAll('.closeBtn[data-close="missionsScreen"]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    ui.missionsScreen.style.display = 'none';
+  });
+});
+
+// ==========================================
 // FUNCIONES DEL MUNDO
 // ==========================================
 function mapSens(v) { return 0.0015 + (v - 1) * (0.0085 / 9); }
@@ -307,6 +460,8 @@ function saveCurrentState() {
   save.placedFurniture = state.placedFurniture;
   save.dayTime = state.dayTime;
   save.plotFloors = state.plotFloors;
+  // El clima se guarda directo desde el selector, pero por si acaso:
+  if (state.weather) save.weather = state.weather;
   Storage.save(save);
 }
 
@@ -334,6 +489,7 @@ function startWorld() {
     shop.closeInventory();
     ui.status.textContent = remaining > 0 ? `Colocado (quedan ${remaining})` : 'Colocado';
     saveCurrentState();
+    actualizarPanelEconomia();
   };
 
   shop = new Shop(save, {
@@ -344,8 +500,19 @@ function startWorld() {
   updateCoins(save.coins);
 
   world.onPlaceRequest = tryPlace;
-  world.onDeleteRequest = (type) => { shop.addToInventory(type, 1); ui.status.textContent = 'Devuelto al inventario'; saveCurrentState(); };
+  
+  world.onDeleteRequest = (type) => { 
+    shop.addToInventory(type, 1); 
+    ui.status.textContent = 'Devuelto al inventario'; 
+    saveCurrentState(); 
+    actualizarPanelEconomia();
+  };
+  
   world.onTVSave = () => { saveCurrentState(); };
+
+  world.onFurniturePlaced = (id) => {
+    updateMissionsOnPlace(id);
+  };
 
   ui.placeConfirm.addEventListener('click', tryPlace);
   ui.placeCancel.addEventListener('click', () => { world.cancelPlacement(); if (shop) shop.clearSelection(); });
@@ -353,7 +520,7 @@ function startWorld() {
   const rotateBtn = document.getElementById('rotateBtn');
   if (rotateBtn) rotateBtn.addEventListener('click', () => { if (world) world.rotateGhost(); });
 
-  ui.moveConfirm.addEventListener('click', () => { world._prepareMoveOriginal(); const ok = world.confirmMove(); ui.status.textContent = ok ? 'Movido' : 'No se puede mover aquí'; saveCurrentState(); });
+  ui.moveConfirm.addEventListener('click', () => { world._prepareMoveOriginal(); const ok = world.confirmMove(); ui.status.textContent = ok ? 'Movido' : 'No se puede mover aquí'; saveCurrentState(); actualizarPanelEconomia(); });
   ui.moveCancel.addEventListener('click', () => world.cancelMove());
 
   ui.editToggle.addEventListener('click', () => {
@@ -364,7 +531,7 @@ function startWorld() {
   });
 
   ui.editMove.addEventListener('click', () => { if (!world.editTarget) return; world._prepareMoveOriginal(); world.startMove(); });
-  ui.editDelete.addEventListener('click', () => { world.deleteTarget(); ui.status.textContent = 'Devuelto al inventario'; saveCurrentState(); });
+  ui.editDelete.addEventListener('click', () => { world.deleteTarget(); ui.status.textContent = 'Devuelto al inventario'; saveCurrentState(); actualizarPanelEconomia(); });
   ui.editClose.addEventListener('click', () => { world.editTarget = null; world.highlightTarget(null); ui.editPanel.style.display = 'none'; if (ui.editContent) ui.editContent.style.display = 'none'; });
   ui.editContent.addEventListener('click', () => { if (world.editTarget && world.editTarget.type === 'tv') world.openTVPanel(world.editTarget); });
 
@@ -406,7 +573,6 @@ function startWorld() {
     ui.settingsScreen.style.display = 'flex';
   });
 
-  // Salir al menú (Usando el modal personalizado)
   ui.backToMenu.addEventListener('click', async () => {
     const quiereSalir = await showCustomConfirm('¿Salir al menú principal?', 'Se guardará todo el progreso.');
     if (quiereSalir) {
@@ -415,12 +581,69 @@ function startWorld() {
     }
   });
 
+  // ==========================================
+  // SISTEMA DE CLIMA (UI)
+  // ==========================================
+  const weatherBtn = document.getElementById('weatherBtn');
+  const weatherMenu = document.getElementById('weatherMenu');
+  const weatherIcon = document.getElementById('weatherIcon');
+  const weatherLabel = document.getElementById('weatherLabel');
+
+  const weatherMeta = {
+    despejado:       { icon: '☀️', label: 'Despejado' },
+    lluvia_moderada: { icon: '🌧️', label: 'Lluvia moderada' },
+    lluvia_intensa:  { icon: '🌧️', label: 'Lluvia intensa' },
+    nieve_moderada:  { icon: '🌨️', label: 'Nieve moderada' },
+    nieve_intensa:   { icon: '❄️', label: 'Nieve intensa' },
+    tormenta:        { icon: '⛈️', label: 'Tormenta eléctrica' },
+  };
+
+  function updateWeatherUI(weather) {
+    const meta = weatherMeta[weather] || weatherMeta.despejado;
+    if (weatherIcon) weatherIcon.textContent = meta.icon;
+    if (weatherLabel) weatherLabel.textContent = meta.label;
+    document.querySelectorAll('.weather-option').forEach(b => {
+      b.classList.toggle('active', b.dataset.weather === weather);
+    });
+  }
+
+  if (weatherBtn && weatherMenu) {
+    weatherBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      weatherMenu.style.display = weatherMenu.style.display === 'none' ? 'flex' : 'none';
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!weatherBtn.contains(e.target) && !weatherMenu.contains(e.target)) {
+        weatherMenu.style.display = 'none';
+      }
+    });
+
+    document.querySelectorAll('.weather-option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const weather = btn.dataset.weather;
+        world.setWeather(weather);
+        updateWeatherUI(weather);
+        weatherMenu.style.display = 'none';
+        save.weather = weather;
+        Storage.save(save);
+      });
+    });
+  }
+
+  updateWeatherUI(save.weather || 'despejado');
+
+  // Iniciar el mundo
   world.start(() => {});
 
   setInterval(() => {
     saveCurrentState();
     ui.status.textContent = `Guardado · ${new Date().toLocaleTimeString()}`;
   }, 5000);
+
+  // Iniciar renta pasiva cada 2 minutos (120,000 ms)
+  if (rentInterval) clearInterval(rentInterval);
+  rentInterval = setInterval(procesarRenta, 120000);
 }
 
 window.addEventListener('beforeunload', () => { saveCurrentState(); });
