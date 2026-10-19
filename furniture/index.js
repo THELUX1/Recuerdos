@@ -28,7 +28,7 @@ export {
 export {
   createWardrobe,
   createCupboard,
-} from './storage.js';
+} from './closets.js';
 
 export {
   createGasStove,
@@ -56,6 +56,10 @@ export {
   createBush,
   createSmallTree,
   createBigTree,
+  createTreeFromGLB,
+  createPineFromGLB,
+  createBushFromGLB,
+  createDeadTreeFromGLB,
 } from './plants.js';
 
 export {
@@ -87,7 +91,7 @@ export { createPlayer } from './player.js';
 import { createBedBasic, createBedDouble, createBedPremium, createBedKing } from './beds.js';
 import { createTableBasic, createTableRound, createTablePremium, createNightstand } from './tables.js';
 import { createChairBasic, createChairUpholstered, createChairPremium } from './chairs.js';
-import { createWardrobe, createCupboard } from './storage.js';
+import { createWardrobe, createCupboard } from './closets.js';
 import {
   createGasStove,
   createElectricStove,
@@ -114,7 +118,11 @@ import {
   createBigTree,
   createBigTreeHD,
   createSmallTreeHD,
-  createBushHD
+  createBushHD,
+  createTreeFromGLB,
+  createPineFromGLB,
+  createBushFromGLB,
+  createDeadTreeFromGLB
 } from './plants.js';
 import { createWall, createWallDoor, createWallWindow, createRoof } from './walls.js';
 import { createSofa, createCoffeeTable, createBookshelf, createPainting, createCeilingFan, createGrassPatch, createFlowers } from './living.js';
@@ -174,21 +182,23 @@ export function createFurniture(type, color = null, style = null, quality = 'med
     case 'luz_aplique':           return createWallSconce();
 
     case 'planta_maceta':  return createPlantPot(color);
-    case 'arbusto':        
-      if (isHigh) {
-        try { return createBushHD(color); } catch (e) { return createBush(color); }
-      }
-      return createBush(color);
-    case 'arbol_chico':    
-      if (isHigh) {
-        try { return createSmallTreeHD(color); } catch (e) { return createSmallTree(color); }
-      }
-      return createSmallTree(color);
-    case 'arbol_grande':   
-      if (isHigh) {
-        try { return createBigTreeHD(color); } catch (e) { return createBigTree(color); }
-      }
-      return createBigTree(color);
+    
+    // === VEGETACIÓN CON MODELOS .GLB ===
+    case 'arbusto': {       
+      return createBushFromGLB(style, quality, color);
+    }
+
+    case 'arbol_chico': {    
+      return createPineFromGLB(style, quality, color);
+    }
+
+    case 'arbol_grande': {   
+      return createTreeFromGLB(style, quality, color);
+    }
+
+    case 'arbol_muerto': {
+      return createDeadTreeFromGLB(style, quality, color);
+    }
 
     case 'lampara':        return createLamp();
     case 'lampara_mesa':   return createDeskLamp(color);

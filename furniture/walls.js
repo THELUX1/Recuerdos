@@ -266,16 +266,20 @@ export function createWallWindow(color, style = 'cruz') {
   const wallMat = mat(color ?? 0xd8d0c0, 0.9);
   const wm = _windowStyleMaterials(style);
   
-  // CORRECCIÓN Z-FIGHTING: Aplicar offset al marco de la ventana
   const frameMat = mat(wm.frame, 0.8);
   frameMat.polygonOffset = true;
   frameMat.polygonOffsetFactor = -1;
   frameMat.polygonOffsetUnits = -1;
+  frameMat.depthWrite = true;
 
   const glassMat = new THREE.MeshStandardMaterial({
-    color: wm.glass, emissive: 0x4466aa, emissiveIntensity: 0.25,
-    transparent: true, opacity: 0.5, roughness: 0.05, metalness: 0.1,
-    depthWrite: false // CORRECCIÓN: Crucial para cristales
+    color: wm.glass, emissive: 0x4466aa, emissiveIntensity: 0.2,
+    transparent: true, opacity: 0.6, roughness: 0.1, metalness: 0.1,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    polygonOffset: true,       
+    polygonOffsetFactor: 1,    
+    polygonOffsetUnits: 1
   });
 
   let WIN_W = 1.6, WIN_H = 1.2, WIN_Y = 1.2;
@@ -286,6 +290,8 @@ export function createWallWindow(color, style = 'cruz') {
   if (style === 'circular') { WIN_W = 1.8; WIN_H = 1.8; WIN_Y = 1.0; }
 
   const sideW = (WALL_W - WIN_W) / 2;
+  
+  // Muros base
   for (const sign of [-1, 1]) {
     const m = new THREE.Mesh(new THREE.BoxGeometry(sideW, WALL_H, WALL_T), wallMat);
     m.position.x = sign * (WIN_W / 2 + sideW / 2);
@@ -293,97 +299,82 @@ export function createWallWindow(color, style = 'cruz') {
     m.castShadow = true; m.receiveShadow = true;
     g.add(m);
 
-    const skirt = new THREE.Mesh(
-      new THREE.BoxGeometry(sideW, 0.12, WALL_T + 0.02),
-      mat(0xb8b0a0, 0.9)
-    );
+    const skirt = new THREE.Mesh(new THREE.BoxGeometry(sideW, 0.12, WALL_T + 0.02), mat(0xb8b0a0, 0.9));
     skirt.position.set(sign * (WIN_W / 2 + sideW / 2), 0.06, 0);
     g.add(skirt);
   }
 
-  const under = new THREE.Mesh(
-    new THREE.BoxGeometry(WIN_W, WIN_Y, WALL_T),
-    wallMat
-  );
+  const under = new THREE.Mesh(new THREE.BoxGeometry(WIN_W, WIN_Y, WALL_T), wallMat);
   under.position.y = WIN_Y / 2;
   under.castShadow = true; under.receiveShadow = true;
   g.add(under);
 
-  const skirtU = new THREE.Mesh(
-    new THREE.BoxGeometry(WIN_W, 0.12, WALL_T + 0.02),
-    mat(0xb8b0a0, 0.9)
-  );
+  const skirtU = new THREE.Mesh(new THREE.BoxGeometry(WIN_W, 0.12, WALL_T + 0.02), mat(0xb8b0a0, 0.9));
   skirtU.position.y = 0.06;
   g.add(skirtU);
 
   const aboveH = WALL_H - WIN_Y - WIN_H;
-  const above = new THREE.Mesh(
-    new THREE.BoxGeometry(WIN_W, aboveH, WALL_T),
-    wallMat
-  );
+  const above = new THREE.Mesh(new THREE.BoxGeometry(WIN_W, aboveH, WALL_T), wallMat);
   above.position.y = WIN_Y + WIN_H + aboveH / 2;
   above.castShadow = true; above.receiveShadow = true;
   g.add(above);
 
-  const ft = 0.1;
-  const tExtra = WALL_T + 0.05;
+  // Marcos
+  const ft = 0.12;
+  const tExtra = WALL_T + 0.06; 
+  const offsetZ = 0;
 
+  // Marcos verticales
   for (const sign of [-1, 1]) {
-    const jamba = new THREE.Mesh(
-      new THREE.BoxGeometry(ft, WIN_H + ft * 2, tExtra),
-      frameMat
-    );
-    jamba.position.set(sign * (WIN_W / 2 - ft / 2), WIN_Y + WIN_H / 2, 0);
+    const jamba = new THREE.Mesh(new THREE.BoxGeometry(ft, WIN_H + ft * 2, tExtra), frameMat);
+    jamba.position.set(sign * (WIN_W / 2 - ft / 2), WIN_Y + WIN_H / 2, offsetZ);
     jamba.castShadow = true;
     g.add(jamba);
   }
 
-  for (const y of [WIN_Y - ft / 2, WIN_Y + WIN_H + ft / 2]) {
-    const travesaño = new THREE.Mesh(
-      new THREE.BoxGeometry(WIN_W, ft, tExtra),
-      frameMat
-    );
-    travesaño.position.set(0, y, 0);
-    travesaño.castShadow = true;
-    g.add(travesaño);
-  }
+  // 🔥 MARCO INFERIOR CORREGIDO: Hundido 2 milímetros para que no choque con la pared de abajo
+  const travesañoAbajo = new THREE.Mesh(
+    new THREE.BoxGeometry(WIN_W, ft, tExtra),
+    frameMat
+  );
+  travesañoAbajo.position.set(0, WIN_Y - ft / 2 + 0.002, offsetZ); 
+  travesañoAbajo.castShadow = true;
+  g.add(travesañoAbajo);
+
+  // 🔥 MARCO SUPERIOR CORREGIDO: Hundido 2 milímetros
+  const travesañoArriba = new THREE.Mesh(
+    new THREE.BoxGeometry(WIN_W, ft, tExtra),
+    frameMat
+  );
+  travesañoArriba.position.set(0, WIN_Y + WIN_H + ft / 2 - 0.002, offsetZ);
+  travesañoArriba.castShadow = true;
+  g.add(travesañoArriba);
 
   if (style === 'cruz' || style === 'grande' || style === 'mirador') {
-    const cruzH = new THREE.Mesh(
-      new THREE.BoxGeometry(WIN_W, ft * 0.6, tExtra * 0.8),
-      frameMat
-    );
-    cruzH.position.set(0, WIN_Y + WIN_H / 2, 0);
+    const cruzH = new THREE.Mesh(new THREE.BoxGeometry(WIN_W, ft * 0.6, tExtra * 0.8), frameMat);
+    cruzH.position.set(0, WIN_Y + WIN_H / 2, offsetZ);
     g.add(cruzH);
 
-    const cruzV = new THREE.Mesh(
-      new THREE.BoxGeometry(ft * 0.6, WIN_H, tExtra * 0.8),
-      frameMat
-    );
-    cruzV.position.set(0, WIN_Y + WIN_H / 2, 0);
+    const cruzV = new THREE.Mesh(new THREE.BoxGeometry(ft * 0.6, WIN_H, tExtra * 0.8), frameMat);
+    cruzV.position.set(0, WIN_Y + WIN_H / 2, offsetZ);
     g.add(cruzV);
   } else if (style === 'arco') {
-    const cruzH = new THREE.Mesh(
-      new THREE.BoxGeometry(WIN_W, ft * 0.6, tExtra * 0.8),
-      frameMat
-    );
-    cruzH.position.set(0, WIN_Y + WIN_H / 2, 0);
+    const cruzH = new THREE.Mesh(new THREE.BoxGeometry(WIN_W, ft * 0.6, tExtra * 0.8), frameMat);
+    cruzH.position.set(0, WIN_Y + WIN_H / 2, offsetZ);
     g.add(cruzH);
   } else if (style === 'circular') {
-    const ring = new THREE.Mesh(
-      new THREE.TorusGeometry(WIN_H / 2 - 0.1, ft * 0.6, 8, 24),
-      frameMat
-    );
-    ring.position.set(0, WIN_Y + WIN_H / 2, 0.02);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(WIN_H / 2 - 0.1, ft * 0.6, 8, 24), frameMat);
+    ring.position.set(0, WIN_Y + WIN_H / 2, offsetZ + 0.02);
     g.add(ring);
   }
 
+  // 🔥 CRISTAL: Le quitamos 4 milímetros de alto y ancho para que nunca toque los marcos
   const glass = new THREE.Mesh(
-    new THREE.BoxGeometry(WIN_W - ft * 2, WIN_H - ft * 2, 0.02),
+    new THREE.BoxGeometry(WIN_W - ft * 2 - 0.004, WIN_H - ft * 2 - 0.004, 0.01),
     glassMat
   );
-  // CORRECCIÓN: Hundir el cristal para que no choque con el marco
-  glass.position.set(0, WIN_Y + WIN_H / 2, -0.02); 
+  glass.position.set(0, WIN_Y + WIN_H / 2, 0); 
+  glass.renderOrder = 1; 
   g.add(glass);
 
   return g;
@@ -402,6 +393,8 @@ export function createRoof(color) {
     roofMat
   );
   roof.castShadow = true; roof.receiveShadow = true;
+  // 🔥 EL ORIGEN DEBE ESTAR EN EL CENTRO DEL TECHO
+  roof.position.y = 0; 
   g.add(roof);
 
   const edge = new THREE.Mesh(
@@ -412,6 +405,6 @@ export function createRoof(color) {
   edge.castShadow = true; edge.receiveShadow = true;
   g.add(edge);
 
-  g.position.y = WALL_H + ROOF_T / 2;
+  // Ya NO le sumamos WALL_H aquí, porque la altura la controla world.js
   return g;
 }
