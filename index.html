@@ -2,37 +2,31 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <!-- Etiquetas para forzar pantalla completa en móvil -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Mi Vecindario 3D</title>
+  <title>Nox</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="in-menu">
   <canvas id="scene"></canvas>
 
-  <!-- Menú inicial -->
+  <!-- MENÚ INICIAL -->
   <div id="menu" class="menu-screen">
     <div class="menu-bg"></div>
-    
     <div class="menu-content">
       <div class="menu-header">
-        <h1>Mi Vecindario</h1>
+        <h1>NOX</h1>
         <p>Construye tu mundo</p>
       </div>
-
       <div class="menu-card">
         <div class="input-group">
           <label>Tu nombre</label>
           <input type="text" id="playerName" placeholder="Ej: Juan" maxlength="15" autocomplete="off">
         </div>
-
         <div class="menu-buttons" style="margin-top: 10px;">
           <button id="customizeAvatarBtn" class="btn-secondary" style="border-color: #4ade80; color: #4ade80; margin-bottom: 8px;">👕 Personalizar Avatar</button>
           <button id="playButton" class="btn-primary">JUGAR</button>
-          
-          <!-- Botones de Pantalla Completa y Ajustes -->
           <div style="display: flex; gap: 8px; margin-top: 8px;">            
            <button id="settingsBtn" class="btn-secondary" style="margin: 0;">⚙ Ajustes</button>
           </div>
@@ -41,82 +35,92 @@
     </div>
   </div>
 
-  <!-- =====================================================
-       EDITOR DE AVATAR (Modal flotante)
-       ===================================================== -->
+  <!-- EDITOR DE AVATAR -->
   <div id="avatarEditorScreen" class="overlay" style="display:none; z-index: 100;">
     <div class="avatar-modal">
       <header>
         <h2>👕 Tu Avatar</h2>
         <button class="closeBtn" data-close="avatarEditorScreen">✕</button>
       </header>
-
       <div class="avatar-editor-content">
         <div class="avatar-preview-box">
           <canvas id="avatar-editor-canvas"></canvas>
         </div>
-
         <div class="avatar-options-box">
           <p class="hint" style="margin-top:0;">Género</p>
           <div class="gender-picker" id="avatarGenderPicker" style="margin-bottom: 15px;">
             <button class="gender-btn active" data-gender="m">👦 Masculino</button>
             <button class="gender-btn" data-gender="f">👧 Femenino</button>
           </div>
-
           <p class="hint">Color de ropa</p>
           <div class="color-carousel" id="avatarColorPicker"></div>
-
           <p class="hint">Color de pantalón</p>
           <div class="color-carousel" id="avatarPantsPicker"></div>
-
           <p class="hint">Color de cabello</p>
           <div class="color-carousel" id="avatarHairPicker"></div>
         </div>
       </div>
     </div>
   </div>
-  <!-- =====================================================
-     SELECTOR DE CLIMA (Centrado arriba)
-     ===================================================== -->
-<div id="weatherSelector" style="display: none; position: absolute; top: 15px; left: 50%; transform: translateX(-50%); z-index: 50;">
-  <button id="weatherBtn" style="background: rgba(30,41,59,0.9); border: 1px solid rgba(148,163,184,0.3); color: white; padding: 8px 16px; border-radius: 12px; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 8px; font-family: inherit;">
-    <span id="weatherIcon">☀️</span>
-    <span id="weatherLabel">Despejado</span>
-  </button>
-  
-  <div id="weatherMenu" style="display: none; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 8px; background: rgba(15,23,42,0.95); border: 1px solid rgba(148,163,184,0.3); border-radius: 12px; padding: 8px; min-width: 200px; flex-direction: column; gap: 4px; backdrop-filter: blur(10px);">
-    <button class="weather-option" data-weather="despejado">☀️ Despejado</button>
-    <button class="weather-option" data-weather="lluvia_moderada">🌧️ Lluvia moderada</button>
-    <button class="weather-option" data-weather="lluvia_intensa">🌧️ Lluvia intensa</button>
-    <button class="weather-option" data-weather="nieve_moderada">🌨️ Nieve moderada</button>
-    <button class="weather-option" data-weather="nieve_intensa">❄️ Nieve intensa</button>
-    <button class="weather-option" data-weather="tormenta">⛈️ Tormenta eléctrica</button>
+
+  <!-- CLIMA -->
+  <div id="weatherSelector" style="display: none; position: absolute; top: 15px; left: 50%; transform: translateX(-50%); z-index: 50;">
+    <button id="weatherBtn" style="background: rgba(30,41,59,0.9); border: 1px solid rgba(148,163,184,0.3); color: white; padding: 8px 16px; border-radius: 12px; cursor: pointer; font-size: 14px; display: flex; align-items: center; gap: 8px; font-family: inherit;">
+      <span id="weatherIcon">☀️</span>
+      <span id="weatherLabel">Despejado</span>
+    </button>
+    <div id="weatherMenu" style="display: none; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 8px; background: rgba(15,23,42,0.95); border: 1px solid rgba(148,163,184,0.3); border-radius: 12px; padding: 8px; min-width: 200px; flex-direction: column; gap: 4px; backdrop-filter: blur(10px);">
+      <button class="weather-option" data-weather="despejado">☀️ Despejado</button>
+      <button class="weather-option" data-weather="lluvia_moderada">🌧️ Lluvia moderada</button>
+      <button class="weather-option" data-weather="lluvia_intensa">🌧️ Lluvia intensa</button>
+      <button class="weather-option" data-weather="nieve_moderada">🌨️ Nieve moderada</button>
+      <button class="weather-option" data-weather="nieve_intensa">❄️ Nieve intensa</button>
+      <button class="weather-option" data-weather="tormenta">⛈️ Tormenta eléctrica</button>
+    </div>
   </div>
-</div>
+
   <!-- HUD -->
   <div id="hud">
-  <span id="status">Listo</span>
-  <span id="coins">🪙 0</span>
-  <span id="clock">🕐 12:00</span>
-  <span id="fps">FPS: --</span>
+    <span id="status">Listo</span>
+    <span id="coins">🪙 0</span>
+    <span id="clock">🕐 12:00</span>
+    <span id="fps">FPS: --</span>
+  </div>
+
+  <button id="dailyRewardBtn" title="Recompensa diaria" style="display:none; position:fixed; top:10px; left:calc(50% + 120px); transform:translateX(-50%); z-index:13; width:46px; height:46px; border-radius:50%; border:2px solid rgba(250,204,21,0.6); background:radial-gradient(circle at 35% 30%, rgba(250,204,21,0.95), rgba(180,120,10,0.95)); color:#1a1a22; font-size:22px; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 4px 14px rgba(0,0,0,0.35);">🎁</button>
+
+  <button id="audioToggle" style="display:none; position:fixed; top:12px; left:calc(50% + 175px); transform:translateX(-50%); z-index:13; width:38px; height:38px; border-radius:50%; border:none; background:rgba(15,23,42,0.7); color:white; font-size:18px; align-items:center; justify-content:center; cursor:pointer; backdrop-filter:blur(6px);">🔊</button>
+
+  <button id="editModeBtn" title="Modo Edición">✏️</button>
+
+  <!-- BOTÓN DE CAMBIO DE HORA -->
+  <button id="timeCycleBtn" title="Cambiar Hora" style="display:none; position:fixed; top:10px; right:122px; z-index:12; width:46px; height:46px; border-radius:12px; border:0; background:#ffd479; color:#172233; font-size:20px; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,0.3); transition: background 0.3s;">☀️</button>
+  <button id="minimapToggleBtn" style="display:none; position:fixed; top:10px; right:178px; z-index:12; width:46px; height:46px; border-radius:12px; border:0; background:#8ef0a8; color:#172233; font-size:20px; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 4px 10px rgba(0,0,0,0.3);">🗺️</button>
+  
+  <!-- MINIMAPA -->
+  <div id="minimapContainer" style="display:none; position:fixed; top:80px; left:10px; z-index:10; width:120px; height:120px; border-radius:50%; overflow:hidden; border:3px solid rgba(30,41,59,0.9); box-shadow:0 4px 12px rgba(0,0,0,0.4); background:#1a2a1a; transition: all 0.3s ease;">
+  <canvas id="minimapCanvas" width="240" height="240" style="width:100%; height:100%; cursor:pointer;"></canvas>
+  <button id="minimapExpandBtn" style="position:absolute; bottom:5px; right:5px; width:28px; height:28px; border-radius:50%; border:none; background:rgba(0,0,0,0.6); color:white; font-size:14px; cursor:pointer;">🔍</button>
+  <button id="minimapCloseBtn" style="display:none; position:absolute; top:10px; right:10px; width:40px; height:40px; border-radius:50%; border:none; background:rgba(255,0,0,0.6); color:white; font-size:20px; cursor:pointer;">✕</button>
 </div>
 
-  <!-- Botón menú único (arriba derecha) -->
+<div id="minimapCoords" style="display:none; position:fixed; top:55px; left:10px; z-index:11; width:120px; text-align:center; color:#cfe4ff; font-size:11px; font-weight:bold; background:rgba(30,41,59,0.85); padding:4px 0; border-radius:8px; border:1px solid rgba(148,163,184,0.3); font-family:monospace; box-shadow:0 2px 6px rgba(0,0,0,0.3);">
+  X: 0  Z: 0
+</div>
   <button id="mainMenuBtn">☰</button>
 
-  <!-- Panel del menú principal (desplegable) -->
+  <!-- MENÚ DESPLEGABLE -->
   <div id="mainMenu" style="display:none">
-  <button id="shopToggle">🛒 Tienda</button>
-  <button id="inventoryToggle">🎒 Inventario</button>
-  <button id="missionsToggle">🎯 Misiones</button>
-  <button id="editToggle">✏️ Editar</button>
-  <button id="settingsToggle">⚙ Ajustes</button>
-  <button id="backToMenu" class="ghost">↩ Salir al menú</button>
-</div>
+    <button id="shopToggle">🛒 Tienda</button>
+    <button id="inventoryToggle">🎒 Inventario</button>
+    <button id="missionsToggle">🎯 Misiones</button>
+    <button id="achievementsToggle">🏆 Logros</button>
+    <button id="companionToggle" style="color: #4ade80;">🐾 Mis Mascotas</button> 
+    <button id="settingsToggle">⚙ Ajustes</button>
+    <button id="backToMenu" class="ghost">↩ Salir al menú</button>
+  </div>
 
-  <!-- =====================================================
-       TIENDA
-       ===================================================== -->
+  <!-- TIENDA -->
   <div id="shopScreen" class="fullscreen" style="display:none">
     <header>
       <h2>🛒 Tienda</h2>
@@ -136,6 +140,7 @@
       <button class="tab" data-tab="techo">🏠 Techos</button>
       <button class="tab" data-tab="escalera">🪜 Escaleras</button>
       <button class="tab" data-tab="electro">🔌 Electro</button>
+      <button class="tab" data-tab="mascota">🐾 Mascotas</button>
     </div>
     <div class="shop-content" id="shopGrid"></div>
     <div class="shop-footer">
@@ -143,9 +148,7 @@
     </div>
   </div>
 
-  <!-- =====================================================
-       INVENTARIO
-       ===================================================== -->
+  <!-- INVENTARIO -->
   <div id="inventoryScreen" class="fullscreen" style="display:none">
     <header>
       <h2>🎒 Inventario</h2>
@@ -158,32 +161,53 @@
       <button id="inventoryCancelBtn" class="ghost">✕</button>
     </div>
   </div>
-<!-- =====================================================
-     MISIONES Y ECONOMÍA
-     ===================================================== -->
-<div id="missionsScreen" class="fullscreen" style="display:none">
-  <header>
-    <h2>🎯 Misiones y Economía</h2>
-    <button class="closeBtn" data-close="missionsScreen">✕</button>
-  </header>
-  
-  <!-- Panel de Renta Pasiva -->
-  <div class="economy-panel" style="background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(250, 204, 21, 0.4); border-radius: 12px; padding: 16px; margin: 0 16px 16px 16px; display: flex; flex-direction: column; gap: 6px;">
-    <h3 style="margin: 0; color: #facc15; font-size: 16px;">🏠 Ingresos por Propiedad</h3>
-    <p style="margin: 0; color: #cbd5e1; font-size: 14px;">Valor de tus muebles: <b id="econPropertyValue" style="color: #60a5fa;">0</b> 🪙</p>
-    <p style="margin: 0; color: #cbd5e1; font-size: 14px;">Renta automática (2 min): <b id="econRentValue" style="color: #4ade80;">0</b> 🪙</p>
-    <p class="hint" style="margin: 4px 0 0 0; font-size: 12px;">Cada 2 minutos recibirás el 2% del valor de tu propiedad. ¡Sigue construyendo para ganar más!</p>
+
+  <!-- PANTALLA DE MASCOTAS -->
+  <div id="companionScreen" class="fullscreen" style="display:none">
+    <header>
+      <h2>🐾 Mis Mascotas</h2>
+      <button class="closeBtn" data-close="companionScreen">✕</button>
+    </header>
+    <p class="hint" style="padding: 0 16px;">Toca una mascota para equiparla o guardarla.</p>
+    <div class="shop-content" id="companionGrid"></div>
+    <div class="shop-footer" style="justify-content: center;">
+      <span class="hint">Las mascotas equipadas tienen un borde verde.</span>
+    </div>
   </div>
 
-  <p class="hint" style="padding: 0 16px;">Completa misiones para ganar monedas extra.</p>
-  <div class="shop-content" id="missionsGrid"></div>
-  <div class="shop-footer">
-    <span>🪙 Recompensas totales: <b id="missionsTotal">0</b></span>
+  <!-- MISIONES -->
+  <div id="missionsScreen" class="fullscreen" style="display:none">
+    <header>
+      <h2>🎯 Misiones y Economía</h2>
+      <button class="closeBtn" data-close="missionsScreen">✕</button>
+    </header>
+    <div class="economy-panel" style="background: rgba(30, 41, 59, 0.9); border: 1px solid rgba(250, 204, 21, 0.4); border-radius: 12px; padding: 16px; margin: 0 16px 16px 16px; display: flex; flex-direction: column; gap: 6px;">
+      <h3 style="margin: 0; color: #facc15; font-size: 16px;">🏠 Ingresos por Propiedad</h3>
+      <p style="margin: 0; color: #cbd5e1; font-size: 14px;">Valor de tus muebles: <b id="econPropertyValue" style="color: #60a5fa;">0</b> 🪙</p>
+      <p style="margin: 0; color: #cbd5e1; font-size: 14px;">Renta automática (2 min): <b id="econRentValue" style="color: #4ade80;">0</b> 🪙</p>
+      <p class="hint" style="margin: 4px 0 0 0; font-size: 12px;">Cada 2 minutos recibirás el 2% del valor de tu propiedad.</p>
+    </div>
+    <p class="hint" style="padding: 0 16px;">Completa misiones para ganar monedas extra.</p>
+    <div class="shop-content" id="missionsGrid"></div>
+    <div class="shop-footer">
+      <span>🪙 Recompensas totales: <b id="missionsTotal">0</b></span>
+    </div>
   </div>
-</div>
-  <!-- =====================================================
-       VENDER
-       ===================================================== -->
+
+  <!-- LOGROS -->
+  <div id="achievementsScreen" class="fullscreen" style="display:none">
+    <header>
+      <h2>🏆 Logros</h2>
+      <button class="closeBtn" data-close="achievementsScreen">✕</button>
+    </header>
+    <p class="hint" style="padding: 0 16px;">Desbloquea logros mientras juegas.</p>
+    <div class="shop-content" id="achievementsGrid"></div>
+    <div class="shop-footer">
+      <span>🪙 Recompensas totales: <b id="achievementsTotal">0</b></span>
+    </div>
+  </div>
+
+  <!-- VENDER -->
   <div id="sellScreen" class="fullscreen" style="display:none">
     <header>
       <h2>💰 Vender muebles</h2>
@@ -196,9 +220,7 @@
     </div>
   </div>
 
-  <!-- =====================================================
-       TV PANEL
-       ===================================================== -->
+  <!-- TV -->
   <div id="tvPanel" class="fullscreen" style="display:none">
     <header>
       <h2 id="tvPanelTitle">📺 Configurar TV</h2>
@@ -226,44 +248,77 @@
     <button id="tvOverlayClose">✕</button>
   </div>
 
-  <!-- =====================================================
-       PANEL DE AJUSTES
-       ===================================================== -->
+  <!-- AJUSTES -->
   <div id="settingsScreen" class="fullscreen" style="display:none">
     <header>
       <h2>⚙ Ajustes</h2>
       <button class="closeBtn" data-close="settingsScreen">✕</button>
     </header>
-    <label>Nombre
-      <input id="settingsName" type="text" maxlength="16">
-    </label>
-    <label>Sensibilidad de cámara
-      <input id="settingsSensitivity" type="range" min="1" max="10" step="1">
-      <span id="settingsSensValue">4</span>
-    </label>
-    <label>Calidad gráfica
-      <select id="settingsQuality">
-        <option value="baja">Baja</option>
-        <option value="media">Media</option>
-        <option value="alta">Alta</option>
-      </select>
-    </label>
-    <button id="settingsApply">Aplicar cambios</button>
-    <button id="settingsReset" class="ghost" style="margin-top:12px">🗑 Borrar progreso</button>
+    
+    <div class="settings-content">
+      <label>Nombre 
+        <input id="settingsName" type="text" maxlength="16" placeholder="Tu nombre...">
+      </label>
+
+      <label>Sensibilidad 
+        <div class="range-wrapper">
+          <input id="settingsSensitivity" type="range" min="1" max="10" step="1">
+          <span id="settingsSensValue">4</span>
+        </div>
+      </label>
+
+      <!-- 🔥 NUEVO: VOLUMEN DE MÚSICA -->
+      <label>Volumen de Música 
+        <div class="range-wrapper">
+          <input id="settingsMusicVolume" type="range" min="0" max="100" step="5" value="30">
+          <span id="settingsMusicVolValue">30%</span>
+        </div>
+      </label>
+
+      <label>Calidad Gráfica
+        <select id="settingsQuality">
+          <option value="baja">Baja (Mejor rendimiento)</option>
+          <option value="media">Media</option>
+          <option value="alta">Alta</option>
+          <option value="ultra">Ultra (No recomendado)</option>
+        </select>
+      </label>
+
+      <label>Densidad de Follaje
+        <select id="settingsFoliage">
+          <option value="baja">🌱 Baja (Pocos árboles)</option>
+          <option value="media">🌿 Media (Equilibrado)</option>
+          <option value="alta">🌳 Alta (Por defecto)</option>
+          <option value="extrema">🌲 Extrema (⚠️ Advertencia)</option>
+        </select>
+      </label>
+      <div id="foliageWarning" class="warning-box" style="display: none;">
+        ⚠️ La densidad Extrema generará muchos más objetos y podría causar caídas de FPS o sobrecalentamiento.
+      </div>
+
+      <label>Distancia de Renderizado
+        <select id="settingsRenderDistance">
+          <option value="baja">📦 Baja (Solo lo más cercano)</option>
+          <option value="media">📦 Media (Recomendado)</option>
+          <option value="alta">📦 Alta (Mayor campo de visión)</option>
+          <option value="extrema">📦 Extrema (⚠️ Advertencia)</option>
+        </select>
+      </label>
+      <div id="renderWarning" class="warning-box" style="display: none;">
+        ⚠️ La distancia Extrema cargará muchos más objetos a tu alrededor y podría causar caídas de FPS.
+      </div>
+    </div>
+
+    <div class="settings-actions">
+      <button id="settingsApply" class="btn-primary">Aplicar cambios</button>
+      <button id="settingsReset" class="btn-danger">🗑 Borrar progreso</button>
+    </div>
   </div>
 
-  <!-- =====================================================
-       BARRA DE PERSONALIZACIÓN
-       ===================================================== -->
+  <!-- BARRAS -->
   <div id="customizeBar" style="display:none">
-    <div id="colorPicker" style="display:none">
-      <p>Color</p>
-      <div id="colorSwatches"></div>
-    </div>
-    <div id="stylePicker" style="display:none">
-      <p>Estilo</p>
-      <div id="styleSwatches"></div>
-    </div>
+    <div id="colorPicker" style="display:none"><p>Color</p><div id="colorSwatches"></div></div>
+    <div id="stylePicker" style="display:none"><p>Estilo</p><div id="styleSwatches"></div></div>
   </div>
 
   <div id="placeBar" style="display:none">
@@ -285,26 +340,19 @@
 
   <div id="moveBar" style="display:none">
     <span>Mueve la vista y confirma</span>
+    <button id="moveRotate" title="Rotar">↻</button>
     <button id="moveConfirm">✓ Mover aquí</button>
     <button id="moveCancel" class="ghost">✕</button>
   </div>
 
   <div id="lookZone"></div>
-
-  <!-- Joystick -->
   <div id="joystick"><div id="stick"></div></div>
-  
-  <!-- Botón de salto -->
-  <button id="jumpBtn" aria-label="Saltar">
-    <span>⤒</span>
-  </button>
-
-  <!-- Botón de interacción -->
+  <button id="jumpBtn" aria-label="Saltar"><span>⤒</span></button>
   <button id="interactBtn">💬</button>
-
-  <!-- =====================================================
-       MODAL DE CONFIRMACIÓN PERSONALIZADO
-       ===================================================== -->
+  
+  <!-- BOTÓN DE CORRER -->
+  <button id="runBtn" style="display:none; position:fixed; bottom: 170px; right: 70px; width: 60px; height: 60px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.4); background: rgba(30, 41, 59, 0.7); color: white; font-size: 24px; align-items: center; justify-content: center; cursor: pointer; z-index: 10;">🏃</button>
+  
   <div id="customConfirm" class="overlay" style="display:none; z-index: 9999;">
     <div class="confirm-box">
       <h3 id="confirmTitle">¿Salir al menú principal?</h3>
@@ -316,24 +364,35 @@
     </div>
   </div>
 
-  <!-- Scripts -->
-  <script>
-    // DIAGNÓSTICO PARA GITHUB (Muestra un error legible si falta un archivo)
-    window.addEventListener('error', function(e) {
-      if (e.message.includes('Failed to fetch dynamically imported module') || e.message.includes('404')) {
-        document.body.innerHTML = `<div style="padding:20px; color:#fff; background:#e24a4a; font-family:sans-serif;">
-          <h2>Error de carga en GitHub</h2>
-          <p>Faltan archivos o hay un error de mayúsculas/minúsculas. Revisa la consola (F12) para ver qué archivo exacto no se encontró.</p>
-          <p>Detalle: ${e.message}</p>
-        </div>`;
-      }
-    });
-  </script>
-  
+  <!-- PANTALLA DE CARGA -->
+  <div id="loadingScreen" style="display:none; position:fixed; inset:0; z-index:9999; background:linear-gradient(160deg, #1e293b 0%, #0f172a 100%); flex-direction:column; align-items:center; justify-content:center; color:white; font-family:'Segoe UI', sans-serif;">
+    <div style="text-align:center; width:80%; max-width:300px;">
+      <div style="font-size: 50px; margin-bottom: 20px; animation: bounce 1.5s infinite;">🌳</div>
+      <h2 style="margin: 0 0 10px; font-size: 20px; color: #4ade80;">Preparando terreno...</h2>
+      <p id="loadingText" style="margin: 0 0 20px; font-size: 14px; color: #94a3b8;">Cargando texturas...</p>
+      <div style="width: 100%; height: 12px; background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);">
+        <div id="loadingBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #4ade80, #22d3ee); border-radius: 10px; transition: width 0.3s ease;"></div>
+      </div>
+      <p id="loadingPercent" style="margin: 10px 0 0; font-size: 14px; font-weight: bold; color: #4ade80;">0%</p>
+    </div>
+  </div>
+
+  <style>
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-15px); }
+    }
+  </style>
+
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
   <script type="importmap">
-  { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+  { 
+    "imports": { 
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    } 
+  }
   </script>
-  <script type="module" src="./main.js?v=20"></script>
+  <script type="module" src="./main.js?v=25"></script>
 </body>
 </html>

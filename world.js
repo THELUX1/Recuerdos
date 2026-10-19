@@ -3,41 +3,66 @@ import * as THREE from 'three';
 import { Controls } from './controls.js';
 import { createFurniture, place, createPlayer } from './furniture/index.js';
 import { createFloor } from './furniture/floors.js';
+import { Audio } from './audio.js';
+import { Companion } from './companion.js';
+import { Terrain } from './terrain.js';
+import { preloadPlantModels } from './furniture/plants.js';
+import { Storage } from './storage.js';
 
 export class World {
   constructor(save) {
     this.save = save;
+
     this.canvas = document.getElementById('scene');
 
+    this.isReady = false;
+    this._companionCache = {};
+
     this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true, powerPreference: "high-performance" });
-    
-    const maxPixelRatio = save.quality === 'alta' ? 1.5 : (save.quality === 'media' ? 0.9 : 1);
+
+    const isUltra = save.quality === 'ultra';
+    const isHigh = save.quality === 'alta' || isUltra;
+    const maxPixelRatio = isUltra ? 2.0 : (isHigh ? 1.5 : (save.quality === 'media' ? 0.9 : 1));
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, maxPixelRatio));
-    
+
     this.renderer.setSize(innerWidth, innerHeight);
     this.renderer.shadowMap.enabled = save.quality !== 'baja';
-    this.renderer.shadowMap.type = save.quality === 'alta' 
-      ? THREE.PCFSoftShadowMap 
+    this.renderer.shadowMap.type = save.quality === 'alta'
+      ? THREE.PCFSoftShadowMap
       : THREE.PCFShadowMap;
-      
+
     this.renderer.shadowMap.autoUpdate = false;
-    this.renderer.shadowMap.needsUpdate = true; 
+    this.renderer.shadowMap.needsUpdate = true;
 
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.1;
 
     this.scene = new THREE.Scene();
-    if (save.quality === 'alta') {
-      this.scene.fog = new THREE.FogExp2(0xcfe4f5, 0.008);
-    }
-    this.camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 500);
+
+    this.camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 2000);
     this.camera.position.set(
       save.position.x ?? 0,
       save.position.y ?? 1.6,
       save.position.z ?? 22
     );
+    
+// 🔥 NUEVO: Render Target para leer la profundidad de la escena
+this.depthRenderTarget = new THREE.WebGLRenderTarget(1, 1, {
+  minFilter: THREE.NearestFilter,
+  magFilter: THREE.NearestFilter,
+  format: THREE.RGBAFormat,
+  type: THREE.UnsignedByteType
+});
+// Creamos un array de bytes de 4 posiciones (RGBA) para leer 1 pixel
+this.depthPixelBuffer = new Uint8Array(4);
+// Buffer oculto para leer el depth buffer
+this.sunFlareRenderTarget = new THREE.WebGLRenderTarget(1, 1);
 
+window.addEventListener('resize', () => {
+  this.sunFlareCanvas.width = window.innerWidth;
+  this.sunFlareCanvas.height = window.innerHeight;
+});
     this.controls = new Controls(this.camera, {
       yaw: save.rotation?.yaw ?? 0,
       pitch: save.rotation?.pitch ?? 0,
@@ -70,6 +95,7 @@ export class World {
     this._toastTvTimer = null;
     this._tvSaveTimer = 0;
     this._lastShadowUpdate = 0;
+    this._lastColPos = null;
 
     // FPS
     this._fpsFrames = 0;
@@ -83,9 +109,7 @@ export class World {
     this.windSpeed = 0.5;
     this.windAmplitude = 0.05;
 
-    /* ============================================================
-       FÍSICA DEL JUGADOR
-       ============================================================ */
+    // Física del jugador
     this.playerFeetY = (save.position?.y ?? 1.6) - 1.6;
     this.playerVelY = 0;
     this.GRAVITY = -18;
@@ -96,133 +120,65 @@ export class World {
     this._avatarHeading = 0;
     this._walkPhase = 0;
 
-    /* ============================================================
-       ESTADO DE INTERACCIÓN
-       ============================================================ */
+    // Propiedades para caminata y correr
+    this.isRunning = false;
+    this._bobTimer = 0;
+    this._baseCameraY = 0;
+    this._lastSavedPos = { x: 0, z: 0 };
+    // Interacción
     this.isSeated = false;
     this.isSleeping = false;
     this._interactTarget = null;
     this._savedStandPos = null;
     this._savedStandRot = null;
 
-    /* ============================================================
-       SUPERFICIES CAMINABLES
-       ============================================================ */
+    // Superficies caminables
     this._walkables = {
-      techo_basico:         0.20,
-      cama_basica:   0.43,
-      cama_doble:    0.50,
-      cama_premium:  0.63,
-      cama_king:     0.70,
-      mesa_basica:   0.80,
-      mesa_redonda:  0.80,
-      mesa_premium:  0.85,
-      mesa_luz:      0.55,
-      bajo_mesada_pileta: 0.90,
-      cocina_gas:         0.92,
-      cocina_electrica:   0.915,
-      ropero:             2.00,
-      alacena:            2.20,
+      techo_basico: 0.20, cama_basica: 0.43, cama_doble: 0.50, cama_premium: 0.63, cama_king: 0.70,
+      mesa_basica: 0.80, mesa_redonda: 0.80, mesa_premium: 0.85, mesa_luz: 0.55,
+      bajo_mesada_pileta: 0.90, cocina_gas: 0.92, cocina_electrica: 0.915, ropero: 2.00, alacena: 2.20,
     };
 
     this._surfaces = {
-      mesa_basica:   0.80,
-      mesa_redonda:  0.80,
-      mesa_premium:  0.85,
-      mesa_luz:      0.55,
-      cama_basica:   0.45,
-      cama_doble:    0.50,
-      cama_premium:  0.65,
-      cama_king:     0.70,
-      muro_basico:   1.60,
-      muro_premium:  1.60,
-      muro_puerta:   1.60,
-      muro_ventana:  1.60,
-      muro_puerta_prem:  1.60,
-      muro_ventana_prem: 1.60,
+      mesa_basica: 0.80, mesa_redonda: 0.80, mesa_premium: 0.85, mesa_luz: 0.55,
+      cama_basica: 0.45, cama_doble: 0.50, cama_premium: 0.65, cama_king: 0.70,
+      muro_basico: 1.60, muro_premium: 1.60, muro_puerta: 1.60, muro_ventana: 1.60,
+      muro_puerta_prem: 1.60, muro_ventana_prem: 1.60,
     };
 
-    this._stackable = [
-      'tv',
-      'alacena_aerea',
-      'luz_plafon',
-      'luz_candelabro',
-      'luz_aplique',
-      'cuadro',
-      'techo_ventilador',
-    ];
-
-    this._wallOnly = new Set([
-      'alacena_aerea',
-      'luz_plafon',
-      'luz_candelabro',
-      'luz_aplique',
-      'cuadro',
-    ]);
-
-    this._outdoorAllowed = new Set([
-      'luz_aplique',
-      'parche_pasto',
-      'flores',
-      'arbusto',
-      'arbol_chico',
-      'arbol_grande',
-      'planta_maceta',
-    ]);
+    this._stackable = ['tv', 'alacena_aerea', 'luz_plafon', 'luz_candelabro', 'luz_aplique', 'cuadro', 'techo_ventilador'];
+    this._wallOnly = new Set(['alacena_aerea', 'luz_plafon', 'luz_candelabro', 'luz_aplique', 'cuadro']);
+    this._outdoorAllowed = new Set(['luz_aplique', 'parche_pasto', 'flores', 'arbusto', 'arbol_chico', 'arbol_grande', 'arbol_muerto', 'planta_maceta']);
 
     this._wallMountHeight = {
-      luz_plafon:     2.85,
-      luz_candelabro: 2.85,
-      luz_aplique:    1.80,
-      alacena_aerea:  1.65,
-      cuadro:         2.0,
-      techo_ventilador: 3.0,
+      luz_plafon: 2.85, luz_candelabro: 2.85, luz_aplique: 1.80, alacena_aerea: 1.65, cuadro: 2.0, techo_ventilador: 3.0,
     };
 
-    this._wallThickness = {
-      player:    0.2,
-      perimeter: 0.6,
-    };
-
+    this._wallThickness = { player: 0.2, perimeter: 0.6 };
     this._wallMargin = 0.05;
 
-    this._originAt = {
-      tv:              'center',
-      alacena_aerea:   'back',
-      luz_plafon:      'center',
-      luz_candelabro:  'center',
-      luz_aplique:     'back',
-      cuadro:          'back',
-      techo_ventilador: 'center',
-      parche_pasto:    'center',
-      flores:          'center',
-    };
-
+    this._originAt = { tv: 'center', alacena_aerea: 'back', luz_plafon: 'center', luz_candelabro: 'center', luz_aplique: 'back', cuadro: 'back', techo_ventilador: 'center', parche_pasto: 'center', flores: 'center' };
     this._debugWallSnap = false;
 
     this._depthByType = {
-      cama_basica:   1.00, cama_doble:    1.45, cama_premium:  1.60, cama_king:     1.90,
-      mesa_basica:   0.80, mesa_redonda:  0.90, mesa_premium:  0.90, mesa_luz:      0.50,
-      silla_basica:  0.45, silla_premium: 0.50, silla_oficina: 0.55,
-      ropero:        0.60, alacena:       0.45,
-      cocina_gas:    0.60, cocina_electrica: 0.60, bajo_mesada_pileta: 0.60, alacena_aerea: 0.40,
-      lavavajillas:  0.60, horno_electrico:   0.60,
-      pava_electrica: 0.20, licuadora:      0.20, ollas:          0.30, sarten:         0.30,
-      luz_plafon:     0.25, luz_candelabro: 0.30, luz_aplique:    0.15,
-      tv:             0.32, lampara:      0.35, lampara_mesa: 0.25, alfombra:     1.80,
-      arbol_grande:  0.60, arbol_chico:   0.45, arbusto:       0.40, planta_maceta: 0.25,
-      escalera_basica:  3.40, escalera_premium: 3.40,
-      sofa:          0.85, mesa_ratona:   0.60, estanteria:    0.35, cuadro:        0.05, techo_ventilador: 0.30,
-      parche_pasto:  1.20,
-      flores:        0.40,
+      cama_basica: 1.00, cama_doble: 1.45, cama_premium: 1.60, cama_king: 1.90,
+      mesa_basica: 0.80, mesa_redonda: 0.90, mesa_premium: 0.90, mesa_luz: 0.50,
+      silla_basica: 0.45, silla_premium: 0.50, silla_oficina: 0.55,
+      ropero: 0.60, alacena: 0.45, cocina_gas: 0.60, cocina_electrica: 0.60, bajo_mesada_pileta: 0.60, alacena_aerea: 0.40,
+      lavavajillas: 0.60, horno_electrico: 0.60, pava_electrica: 0.20, licuadora: 0.20, ollas: 0.30, sarten: 0.30,
+      luz_plafon: 0.25, luz_candelabro: 0.30, luz_aplique: 0.15,
+      tv: 0.32, lampara: 0.35, lampara_mesa: 0.25, alfombra: 1.80,
+      arbol_grande: 0.60, arbol_chico: 0.45, arbusto: 0.40, planta_maceta: 0.25,
+      escalera_basica: 3.40, escalera_premium: 3.40,
+      sofa: 0.85, mesa_ratona: 0.60, estanteria: 0.35, cuadro: 0.05, techo_ventilador: 0.30,
+      parche_pasto: 1.20, flores: 0.40,
     };
 
-    this._plotFloors  = {};
+    this._plotFloors = {};
     this._floorMeshes = {};
     this._lastAppliedFloor = null;
 
     this.clouds = [];
-
     this.dayTime = save.dayTime ?? 0.30;
     this.daySpeed = 1 / 2400;
 
@@ -250,10 +206,11 @@ export class World {
     this._lightningTimer = 0;
     this._stormFlashActive = false;
 
+    // CONSTRUCCIÓN DE ESCENA
     this._buildSky();
     this._initWeather();
-    this._prefillClouds(); // <-- NUEVO: Nubes ya presentes al iniciar
-    
+    this._prefillClouds();
+
     if (this.save.weather && this.save.weather !== 'despejado') {
       this.targetWeather = this.save.weather;
       this.weatherIntensity = 1;
@@ -261,8 +218,30 @@ export class World {
 
     this._lights();
     this._buildNeighborhood();
-    this._loadFurniture();
-    this._loadPlotFloors();
+
+    // TERRENO EXPANDIDO Y CARGA ASÍNCRONA
+    this.terrain = new Terrain(this.scene, save.quality);
+    this.grass = this.terrain.grass;
+
+    preloadPlantModels().then(() => {
+      this._loadFurniture();
+      this._loadPlotFloors();
+
+      setTimeout(() => {
+        if (!this.save.worldScatter || this.save.worldScatter.length === 0) {
+          this._generateWildVegetation();
+        } else {
+          this._loadWildVegetation();
+        }
+        this.isReady = true;
+      }, 1000);
+    }).catch((err) => {
+      console.warn("Error cargando modelos 3D:", err);
+      this._loadFurniture();
+      this._loadPlotFloors();
+      this.isReady = true;
+    });
+
     this._initPlacementTap();
     this._createHighlight();
     this._initInteractButton();
@@ -276,63 +255,58 @@ export class World {
 
     addEventListener('resize', () => this._resize());
   }
+  _initWeather() {
+  const cx = this.camera.position.x;
+  const cz = this.camera.position.z;
 
-   _initWeather() {
-  // === LLUVIA ===
+  // 🌧️ LLUVIA
   const rainCount = 2000;
   const rainGeo = new THREE.BufferGeometry();
   const rainPos = new Float32Array(rainCount * 3);
   this._rainVelocities = new Float32Array(rainCount);
-  
   for (let i = 0; i < rainCount; i++) {
-    rainPos[i * 3] = (Math.random() - 0.5) * 80;
+    rainPos[i * 3] = cx + (Math.random() - 0.5) * 80;
     rainPos[i * 3 + 1] = Math.random() * 30;
-    rainPos[i * 3 + 2] = (Math.random() - 0.5) * 80;
+    rainPos[i * 3 + 2] = cz + (Math.random() - 0.5) * 80;
     this._rainVelocities[i] = 0.3 + Math.random() * 0.4;
   }
   rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
-  
-  const rainMat = new THREE.PointsMaterial({
-    color: 0xaaccff, size: 0.12, transparent: true, opacity: 0, depthWrite: false
-  });
+  const rainMat = new THREE.PointsMaterial({ color: 0xaaccff, size: 0.12, transparent: true, opacity: 0, depthWrite: false });
   this.rainSystem = new THREE.Points(rainGeo, rainMat);
   this.rainSystem.visible = false;
-  this.rainSystem.position.set(0, 0, 0);
   this.rainSystem.frustumCulled = false;
   this.scene.add(this.rainSystem);
 
-  // === NIEVE ===
+  // ❄️ NIEVE
   const snowCount = 1200;
   const snowGeo = new THREE.BufferGeometry();
   const snowPos = new Float32Array(snowCount * 3);
-  
   for (let i = 0; i < snowCount; i++) {
-    snowPos[i * 3] = (Math.random() - 0.5) * 80;
+    snowPos[i * 3] = cx + (Math.random() - 0.5) * 80;
     snowPos[i * 3 + 1] = Math.random() * 30;
-    snowPos[i * 3 + 2] = (Math.random() - 0.5) * 80;
+    snowPos[i * 3 + 2] = cz + (Math.random() - 0.5) * 80;
   }
   snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPos, 3));
-  
-  const snowMat = new THREE.PointsMaterial({
-    color: 0xffffff, size: 0.28, transparent: true, opacity: 0, depthWrite: false
-  });
+  const snowMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.28, transparent: true, opacity: 0, depthWrite: false });
   this.snowSystem = new THREE.Points(snowGeo, snowMat);
   this.snowSystem.visible = false;
-  this.snowSystem.position.set(0, 0, 0);
   this.snowSystem.frustumCulled = false;
   this.scene.add(this.snowSystem);
 
   this._lightningTimer = 0;
   this._stormFlashActive = false;
   this._cloudBoosted = false;
-  
-  // === RAYOS ===
   this._lightningBolts = [];
   this._lightningCooldown = 5;
 }
 
 setWeather(type) {
   this.targetWeather = type;
+}
+
+setTimeOfDay(time) {
+  this.dayTime = time;
+  this._updateDayCycle(0);
 }
 
 _updateWeather(dt) {
@@ -348,7 +322,6 @@ _updateWeather(dt) {
   const isStorm = this.targetWeather === 'tormenta';
   const isIntense = this.targetWeather === 'lluvia_intensa' || this.targetWeather === 'nieve_intensa' || isStorm;
 
-  // --- VISIBILIDAD ---
   if (isRain) {
     this.rainSystem.visible = this.weatherIntensity > 0.01;
     this.rainSystem.material.opacity = this.weatherIntensity * (isIntense ? 0.85 : 0.55);
@@ -365,40 +338,56 @@ _updateWeather(dt) {
     this.snowSystem.visible = false;
   }
 
-  // --- MOVIMIENTO Y COLISIÓN ---
   const raycaster = new THREE.Raycaster();
   const rayDir = new THREE.Vector3(0, -1, 0);
-  const roofMeshes = this.placed
-    .filter(p => p.type === 'techo_basico')
-    .map(p => p.obj);
+  const roofMeshes = this.placed.filter(p => p.type === 'techo_basico').map(p => p.obj);
+
+  const FLOOR_Y = (this.terrain && typeof this.terrain.getFloorY === 'function') ? this.terrain.getFloorY() : -20;
+  const WORLD_RAIN = 60;
+  const HALF_RAIN = WORLD_RAIN;
 
   if (this.rainSystem.visible) {
     const pos = this.rainSystem.geometry.attributes.position.array;
     const speedMult = isIntense ? 90 : 60;
-    
-    for (let i = 0; i < this._rainVelocities.length; i++) {
-      pos[i * 3 + 1] -= this._rainVelocities[i] * speedMult * dt;
-      
-      const dx = pos[i * 3] - this.camera.position.x;
-      const dz = pos[i * 3 + 2] - this.camera.position.z;
-      const distToPlayer = Math.hypot(dx, dz);
+    const rainCount = this._rainVelocities.length;
 
-      if (distToPlayer < 15 && pos[i * 3 + 1] < 5.0) {
-        raycaster.set(new THREE.Vector3(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]), rayDir);
+    for (let i = 0; i < rainCount; i++) {
+      pos[i * 3 + 1] -= this._rainVelocities[i] * speedMult * dt;
+      const wx = pos[i * 3]; const wy = pos[i * 3 + 1]; const wz = pos[i * 3 + 2];
+      const farX = wx - this.camera.position.x; const farZ = wz - this.camera.position.z;
+      
+      if (Math.abs(farX) > HALF_RAIN || Math.abs(farZ) > HALF_RAIN) {
+        pos[i * 3 + 1] = 30;
+        pos[i * 3] = this.camera.position.x + (Math.random() - 0.5) * WORLD_RAIN * 2;
+        pos[i * 3 + 2] = this.camera.position.z + (Math.random() - 0.5) * WORLD_RAIN * 2;
+        continue;
+      }
+
+      if (Math.hypot(farX, farZ) < 15 && wy < 5.0) {
+        raycaster.set(new THREE.Vector3(wx, wy, wz), rayDir);
         const hits = raycaster.intersectObjects(roofMeshes, true);
-        
         if (hits.length > 0) {
           pos[i * 3 + 1] = 30;
-          pos[i * 3] = (Math.random() - 0.5) * 80;
-          pos[i * 3 + 2] = (Math.random() - 0.5) * 80;
+          pos[i * 3] = this.camera.position.x + (Math.random() - 0.5) * WORLD_RAIN * 2;
+          pos[i * 3 + 2] = this.camera.position.z + (Math.random() - 0.5) * WORLD_RAIN * 2;
           continue;
         }
       }
 
-      if (pos[i * 3 + 1] < 0) {
+      let groundY = FLOOR_Y;
+      if (this.terrain && this.terrain.mesh) {
+        raycaster.set(new THREE.Vector3(wx, wy + 1, wz), rayDir);
+        const groundHits = raycaster.intersectObject(this.terrain.mesh, true);
+        if (groundHits.length > 0) groundY = groundHits[0].point.y;
+        else if (this.terrain.getHeightAt) groundY = this.terrain.getHeightAt(wx, wz) - 5;
+      } else if (this.terrain && this.terrain.getHeightAt) {
+        groundY = this.terrain.getHeightAt(wx, wz) - 5;
+      }
+
+      if (pos[i * 3 + 1] < groundY - 0.5) {
         pos[i * 3 + 1] = 30;
-        pos[i * 3] = (Math.random() - 0.5) * 80;
-        pos[i * 3 + 2] = (Math.random() - 0.5) * 80;
+        pos[i * 3] = this.camera.position.x + (Math.random() - 0.5) * WORLD_RAIN * 2;
+        pos[i * 3 + 2] = this.camera.position.z + (Math.random() - 0.5) * WORLD_RAIN * 2;
       }
     }
     this.rainSystem.geometry.attributes.position.needsUpdate = true;
@@ -408,822 +397,677 @@ _updateWeather(dt) {
     const pos = this.snowSystem.geometry.attributes.position.array;
     const time = performance.now() * 0.001;
     const fallSpeed = isIntense ? 4 : 2.5;
+    const snowCount = pos.length / 3;
 
-    for (let i = 0; i < pos.length / 3; i++) {
+    for (let i = 0; i < snowCount; i++) {
       pos[i * 3 + 1] -= fallSpeed * dt;
       pos[i * 3] += Math.sin(time + i * 0.5) * 0.6 * dt;
+      const wx = pos[i * 3]; const wy = pos[i * 3 + 1]; const wz = pos[i * 3 + 2];
+      const farX = wx - this.camera.position.x; const farZ = wz - this.camera.position.z;
+      
+      if (Math.abs(farX) > HALF_RAIN || Math.abs(farZ) > HALF_RAIN) {
+        pos[i * 3 + 1] = 30;
+        pos[i * 3] = this.camera.position.x + (Math.random() - 0.5) * WORLD_RAIN * 2;
+        pos[i * 3 + 2] = this.camera.position.z + (Math.random() - 0.5) * WORLD_RAIN * 2;
+        continue;
+      }
 
-      const dx = pos[i * 3] - this.camera.position.x;
-      const dz = pos[i * 3 + 2] - this.camera.position.z;
-      const distToPlayer = Math.hypot(dx, dz);
-
-      if (distToPlayer < 15 && pos[i * 3 + 1] < 5.0) {
-        raycaster.set(new THREE.Vector3(pos[i * 3], pos[i * 3 + 1], pos[i * 3 + 2]), rayDir);
+      if (Math.hypot(farX, farZ) < 15 && wy < 5.0) {
+        raycaster.set(new THREE.Vector3(wx, wy, wz), rayDir);
         const hits = raycaster.intersectObjects(roofMeshes, true);
-        
         if (hits.length > 0) {
           pos[i * 3 + 1] = 30;
-          pos[i * 3] = (Math.random() - 0.5) * 80;
-          pos[i * 3 + 2] = (Math.random() - 0.5) * 80;
+          pos[i * 3] = this.camera.position.x + (Math.random() - 0.5) * WORLD_RAIN * 2;
+          pos[i * 3 + 2] = this.camera.position.z + (Math.random() - 0.5) * WORLD_RAIN * 2;
           continue;
         }
       }
 
-      if (pos[i * 3 + 1] < 0) {
+      let groundY = FLOOR_Y;
+      if (this.terrain && this.terrain.mesh) {
+        raycaster.set(new THREE.Vector3(wx, wy + 1, wz), rayDir);
+        const groundHits = raycaster.intersectObject(this.terrain.mesh, true);
+        if (groundHits.length > 0) groundY = groundHits[0].point.y;
+        else if (this.terrain.getHeightAt) groundY = this.terrain.getHeightAt(wx, wz) - 5;
+      } else if (this.terrain && this.terrain.getHeightAt) {
+        groundY = this.terrain.getHeightAt(wx, wz) - 5;
+      }
+
+      if (pos[i * 3 + 1] < groundY - 0.3) {
         pos[i * 3 + 1] = 30;
-        pos[i * 3] = (Math.random() - 0.5) * 80;
-        pos[i * 3 + 2] = (Math.random() - 0.5) * 80;
+        pos[i * 3] = this.camera.position.x + (Math.random() - 0.5) * WORLD_RAIN * 2;
+        pos[i * 3 + 2] = this.camera.position.z + (Math.random() - 0.5) * WORLD_RAIN * 2;
       }
     }
     this.snowSystem.geometry.attributes.position.needsUpdate = true;
   }
 
-  // --- TORMENTA: DESTELLO GLOBAL Y RAYOS VISUALES ---
   if (isStorm && this.weatherIntensity > 0.5) {
     this._lightningTimer -= dt;
     this._lightningCooldown -= dt;
-    
-    // Destello global (relámpago de fondo)
+
     if (this._lightningTimer <= 0) {
-      this._lightningTimer = 2 + Math.random() * 5;
+      this._lightningTimer = 10 + Math.random() * 20;
       this._stormFlashActive = true;
       setTimeout(() => { this._stormFlashActive = false; }, 120);
     }
-    
-    // Rayo visual (tubo que cae)
+
     if (this._lightningCooldown <= 0) {
-      this._lightningCooldown = 4 + Math.random() * 8;
-      
+      this._lightningCooldown = 10 + Math.random() * 20;
       const boltGroup = new THREE.Group();
-      const startX = (Math.random() - 0.5) * 80;
-      const startZ = (Math.random() - 0.5) * 80;
-      const endX = startX + (Math.random() - 0.5) * 10;
-      const endZ = startZ + (Math.random() - 0.5) * 10;
-      
+      const startX = (Math.random() - 0.5) * 80; const startZ = (Math.random() - 0.5) * 80;
+      const endX = startX + (Math.random() - 0.5) * 10; const endZ = startZ + (Math.random() - 0.5) * 10;
+
       const points = [];
       const segments = 8;
       for (let i = 0; i <= segments; i++) {
         const t = i / segments;
         const jitterX = (Math.random() - 0.5) * 2 * (1 - Math.abs(t - 0.5) * 2);
         const jitterZ = (Math.random() - 0.5) * 2 * (1 - Math.abs(t - 0.5) * 2);
-        points.push(new THREE.Vector3(
-          startX + (endX - startX) * t + jitterX,
-          30 - t * 30,
-          startZ + (endZ - startZ) * t + jitterZ
-        ));
+        points.push(new THREE.Vector3(startX + (endX - startX) * t + jitterX, 30 - t * 30, startZ + (endZ - startZ) * t + jitterZ));
       }
-      
+
       const curve = new THREE.CatmullRomCurve3(points);
       const tubeGeo = new THREE.TubeGeometry(curve, 20, 0.15, 4, false);
-      const boltMat = new THREE.MeshBasicMaterial({ 
-        color: 0xffffcc, 
-        transparent: true, 
-        opacity: 1,
-        blending: THREE.AdditiveBlending
-      });
+      const boltMat = new THREE.MeshBasicMaterial({ color: 0xffffcc, transparent: true, opacity: 1, blending: THREE.AdditiveBlending });
       const boltMesh = new THREE.Mesh(tubeGeo, boltMat);
       boltGroup.add(boltMesh);
-      
+
       const boltLight = new THREE.PointLight(0xffffcc, 50, 40, 1.5);
       boltLight.position.set(endX, 10, endZ);
       boltGroup.add(boltLight);
-      
+
       this.scene.add(boltGroup);
-      this._lightningBolts.push({ 
-        group: boltGroup, 
-        light: boltLight, 
-        life: 0.3
-      });
+      this._lightningBolts.push({ group: boltGroup, light: boltLight, life: 0.3 });
+      Audio.play('trueno', { volume: 0.8 });
     }
   }
 
-  // Actualizar rayos existentes (desvanecerse)
   for (let i = this._lightningBolts.length - 1; i >= 0; i--) {
     const bolt = this._lightningBolts[i];
     bolt.life -= dt;
     bolt.light.intensity = Math.max(0, bolt.life * 150);
-    bolt.group.traverse(o => {
-      if (o.isMesh && o.material) {
-        o.material.opacity = Math.max(0, bolt.life * 3.33);
-      }
-    });
-    if (bolt.life <= 0) {
-      this.scene.remove(bolt.group);
-      this._lightningBolts.splice(i, 1);
-    }
+    bolt.group.traverse(o => { if (o.isMesh && o.material) o.material.opacity = Math.max(0, bolt.life * 3.33); });
+    if (bolt.life <= 0) { this.scene.remove(bolt.group); this._lightningBolts.splice(i, 1); }
   }
 
-  // --- OCULTAR EL SOL CON MAL CLIMA ---
   if (this.sunMesh) {
     const sunTargetOpacity = this.weatherIntensity > 0.1 ? 0 : 1;
     const currentSunOpacity = parseFloat(this.sunMesh.material.opacity) || 0;
     this.sunMesh.material.opacity = currentSunOpacity + (sunTargetOpacity - currentSunOpacity) * Math.min(1, 2 * dt);
   }
 
-  // --- GENERAR NUBES RÁPIDO CON MAL CLIMA ---
   if (this.weatherIntensity > 0.1 && !this._cloudBoosted) {
     this._cloudBoosted = true;
     for (let i = 0; i < 50; i++) {
       setTimeout(() => {
         const cloud = this._createCloud();
-        const x = (Math.random() - 0.5) * 200;
-        const z = (Math.random() - 0.5) * 200;
-        const y = 40 + Math.random() * 25;
-        cloud.position.set(x, y, z);
-        
-        const vx = Math.cos(this._windAngle) * this._windSpeed * 2;
-        const vz = Math.sin(this._windAngle) * this._windSpeed * 2;
-        cloud.userData.vx = vx;
-        cloud.userData.vz = vz;
-        
+        cloud.position.set((Math.random() - 0.5) * 200, 40 + Math.random() * 25, (Math.random() - 0.5) * 200);
+        cloud.userData.vx = Math.cos(this._windAngle) * this._windSpeed * 2;
+        cloud.userData.vz = Math.sin(this._windAngle) * this._windSpeed * 2;
         const scale = 1.2 + Math.random() * 1.0;
         cloud.scale.set(scale, scale, scale);
-        
-        this.scene.add(cloud);
-        this.clouds.push(cloud);
+        this.scene.add(cloud); this.clouds.push(cloud);
       }, i * 30);
     }
   } else if (this.weatherIntensity <= 0.1) {
     this._cloudBoosted = false;
   }
+
+  if (Audio.ctx && Audio._loaded) {
+    const isRainNow = this.targetWeather.includes('lluvia') || this.targetWeather === 'tormenta';
+    const isSnowNow = this.targetWeather.includes('nieve');
+    const lluviaVol = isRainNow ? this.weatherIntensity * 0.6 : 0;
+    if (lluviaVol > 0.01 && !Audio.activeLoops['lluvia']) Audio.play('lluvia', { volume: 0, loop: true });
+    if (Audio.activeLoops['lluvia']) {
+      Audio.setLoopVolume('lluvia', lluviaVol);
+      if (lluviaVol <= 0.01 && this.weatherIntensity <= 0.01) Audio.stopLoop('lluvia');
+    }
+    const vientoVol = isSnowNow ? this.weatherIntensity * 0.4 : 0;
+    if (vientoVol > 0.01 && !Audio.activeLoops['viento']) Audio.play('viento', { volume: 0, loop: true });
+    if (Audio.activeLoops['viento']) {
+      Audio.setLoopVolume('viento', vientoVol);
+      if (vientoVol <= 0.01 && this.weatherIntensity <= 0.01) Audio.stopLoop('viento');
+    }
+  }
 }
-  _initEditPanelEvents() {
-    const contentBtn = document.getElementById('editContent');
-    const moveBtn = document.getElementById('editMove');
-    const deleteBtn = document.getElementById('editDelete');
-    const closeBtn = document.getElementById('editClose');
+_initEditPanelEvents() {
+  const contentBtn = document.getElementById('editContent');
+  const moveBtn = document.getElementById('editMove');
+  const deleteBtn = document.getElementById('editDelete');
+  const closeBtn = document.getElementById('editClose');
+  if (contentBtn) contentBtn.onclick = () => { if (this.editTarget && (this.editTarget.type === 'tv' || this.editTarget.type === 'cuadro')) this.openTVPanel(this.editTarget, this.editTarget.type === 'cuadro'); };
+  if (moveBtn) moveBtn.onclick = () => this.startMove();
+  if (deleteBtn) deleteBtn.onclick = () => this.deleteTarget();
+  if (closeBtn) closeBtn.onclick = () => { this.setEditMode(false); document.getElementById('editPanel').style.display = 'none'; };
+}
 
-    if (contentBtn) {
-      contentBtn.onclick = () => {
-        if (this.editTarget && (this.editTarget.type === 'tv' || this.editTarget.type === 'cuadro')) {
-          this.openTVPanel(this.editTarget, this.editTarget.type === 'cuadro');
-        }
-      };
-    }
-    if (moveBtn) moveBtn.onclick = () => this.startMove();
-    if (deleteBtn) deleteBtn.onclick = () => this.deleteTarget();
-    if (closeBtn) closeBtn.onclick = () => {
-      this.setEditMode(false);
-      document.getElementById('editPanel').style.display = 'none';
-    };
+_initTVPanelEvents() {
+  const loadBtn = document.getElementById('tvLoad');
+  const stopBtn = document.getElementById('tvStop');
+  if (loadBtn) loadBtn.onclick = () => { const url = document.getElementById('tvUrl').value; if (!url) return; if (this.tvTarget) { this.loadTVContent(this.tvTarget, url); this.saveMediaUrl(this.tvTarget, url); } };
+  if (stopBtn) stopBtn.onclick = () => { if (this.tvTarget) { this.stopTVContent(this.tvTarget); this.saveMediaUrl(this.tvTarget, ''); } };
+}
+
+_initInteractButton() {
+  const btn = document.getElementById('interactBtn');
+  if (!btn) return;
+  btn.addEventListener('touchstart', (e) => { e.preventDefault(); this.interact(); }, { passive: false });
+  btn.addEventListener('mousedown', (e) => { e.preventDefault(); this.interact(); });
+  btn.addEventListener('touchstart', () => btn.classList.add('active'), { passive: true });
+  btn.addEventListener('touchend', () => btn.classList.remove('active'));
+  btn.addEventListener('touchcancel', () => btn.classList.remove('active'));
+  btn.addEventListener('mousedown', () => btn.classList.add('active'));
+  btn.addEventListener('mouseup', () => btn.classList.remove('active'));
+  btn.addEventListener('mouseleave', () => btn.classList.remove('active'));
+}
+
+_findInteractableNearby(maxDist = 2.0) {
+  let best = null; let bestDist = maxDist;
+  for (const p of this.placed) {
+    const interactive = p.obj?.userData?.interactive;
+    if (!interactive) continue;
+    const dx = this.camera.position.x - p.x;
+    const dz = this.camera.position.z - p.z;
+    const d = Math.hypot(dx, dz);
+    if (d < bestDist) { bestDist = d; best = p; }
   }
+  return best;
+}
 
-  _initTVPanelEvents() {
-    const loadBtn = document.getElementById('tvLoad');
-    const stopBtn = document.getElementById('tvStop');
-    
-    if (loadBtn) {
-      loadBtn.onclick = () => {
-        const url = document.getElementById('tvUrl').value;
-        if (!url) return;
-        if (this.tvTarget) {
-          this.loadTVContent(this.tvTarget, url);
-          this.saveMediaUrl(this.tvTarget, url);
-        }
-      };
-    }
+interact() {
+  if (this.isSeated || this.isSleeping) { this._standUp(); return; }
+  const target = this._findInteractableNearby(2.0);
+  if (!target) return;
+  const kind = target.obj.userData.interactive;
+  if (kind === 'painting') { this.openTVPanel(target, true); return; }
+  if (kind !== 'seat' && kind !== 'sleep') return;
 
-    if (stopBtn) {
-      stopBtn.onclick = () => {
-        if (this.tvTarget) {
-          this.stopTVContent(this.tvTarget);
-          this.saveMediaUrl(this.tvTarget, '');
-        }
-      };
-    }
-  }
+  this._savedStandPos = { x: this.camera.position.x, y: this.camera.position.y, z: this.camera.position.z };
+  this._savedStandRot = { yaw: this.controls.yaw, pitch: this.controls.pitch };
+  this._interactTarget = target;
+  const rot = target.rotY ?? 0;
 
-  _initInteractButton() {
-    const btn = document.getElementById('interactBtn');
-    if (!btn) return;
-
-    btn.addEventListener('touchstart', (e) => {
-      e.preventDefault();
-      this.interact();
-    }, { passive: false });
-
-    btn.addEventListener('mousedown', (e) => {
-      e.preventDefault();
-      this.interact();
-    });
-
-    btn.addEventListener('touchstart', () => btn.classList.add('active'), { passive: true });
-    btn.addEventListener('touchend',   () => btn.classList.remove('active'));
-    btn.addEventListener('touchcancel',() => btn.classList.remove('active'));
-    btn.addEventListener('mousedown',  () => btn.classList.add('active'));
-    btn.addEventListener('mouseup',    () => btn.classList.remove('active'));
-    btn.addEventListener('mouseleave', () => btn.classList.remove('active'));
-  }
-
-  _findInteractableNearby(maxDist = 2.0) {
-    let best = null;
-    let bestDist = maxDist;
-
-    for (const p of this.placed) {
-      const interactive = p.obj?.userData?.interactive;
-      if (!interactive) continue;
-
-      const dx = this.camera.position.x - p.x;
-      const dz = this.camera.position.z - p.z;
-      const d = Math.hypot(dx, dz);
-
-      if (d < bestDist) {
-        bestDist = d;
-        best = p;
-      }
-    }
-    return best;
-  }
-
-  interact() {
-    if (this.isSeated || this.isSleeping) {
-      this._standUp();
-      return;
-    }
-
-    const target = this._findInteractableNearby(2.0);
-    if (!target) return;
-
-    const kind = target.obj.userData.interactive;
-
-    if (kind === 'painting') {
-      this.openTVPanel(target, true);
-      return;
-    }
-
-    if (kind !== 'seat' && kind !== 'sleep') return;
-
-    this._savedStandPos = {
-      x: this.camera.position.x, y: this.camera.position.y, z: this.camera.position.z,
-    };
-    this._savedStandRot = {
-      yaw: this.controls.yaw, pitch: this.controls.pitch,
-    };
-
-    this._interactTarget = target;
-    const rot = target.rotY ?? 0;
-
-    if (kind === 'seat') {
-      const seatHeight = target.obj.userData.seatHeight ?? 0.52;
-      const localOffset = new THREE.Vector3(0, 0, 0.05); 
-      localOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), rot);
-
-      const sitX = target.x + localOffset.x;
-      const sitZ = target.z + localOffset.z;
-      const sitY = target.y + seatHeight + this.PLAYER_HEIGHT - 0.2; 
-
-      this.camera.position.set(sitX, sitY, sitZ);
-      this.controls.yaw = rot;
-      this.controls.pitch = 0;
-      this.controls._applyRotation();
-      this.playerFeetY = target.y + seatHeight - 0.2;
-
-      this.isSeated = true;
-      this.isSleeping = false;
-
-      if (this.playerAvatar) {
-        const piernaIzq = this.playerAvatar.userData.piernaIzq;
-        const piernaDer = this.playerAvatar.userData.piernaDer;
-        if (piernaIzq) piernaIzq.rotation.x = -Math.PI / 2;
-        if (piernaDer) piernaDer.rotation.x = -Math.PI / 2;
-      }
-
-    } else if (kind === 'sleep') {
-      const bedHeight = target.obj.userData.seatHeight ?? 0.45;
-      const sitY = target.y + bedHeight + 0.4;
-
-      this.camera.position.set(target.x, sitY, target.z);
-      this.controls.yaw = rot + Math.PI / 2;
-      this.controls.pitch = -0.4;
-      this.controls._applyRotation();
-      this.playerFeetY = target.y + bedHeight;
-
-      this.isSleeping = true;
-      this.isSeated = false;
-
-      if (this.playerAvatar) {
-        const piernaIzq = this.playerAvatar.userData.piernaIzq;
-        const piernaDer = this.playerAvatar.userData.piernaDer;
-        if (piernaIzq) piernaIzq.rotation.x = 0;
-        if (piernaDer) piernaDer.rotation.x = 0;
-      }
-    }
-
-    this._updateInteractBtn();
-  }
-
-  _standUp() {
-    if (this._savedStandPos) {
-      this.camera.position.set(this._savedStandPos.x, this._savedStandPos.y, this._savedStandPos.z);
-      this.playerFeetY = this._savedStandPos.y - this.PLAYER_HEIGHT;
-      this.playerVelY = 0;
-    }
-    if (this._savedStandRot) {
-      this.controls.yaw = this._savedStandRot.yaw;
-      this.controls.pitch = this._savedStandRot.pitch;
-      this.controls._applyRotation();
-    }
-
-    this.isSeated = false;
-    this.isSleeping = false;
-    this._interactTarget = null;
-    this._savedStandPos = null;
-    this._savedStandRot = null;
-
+  if (kind === 'seat') {
+    const seatHeight = target.obj.userData.seatHeight ?? 0.52;
+    const localOffset = new THREE.Vector3(0, 0, 0.05);
+    localOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), rot);
+    const sitX = target.x + localOffset.x;
+    const sitZ = target.z + localOffset.z;
+    const sitY = target.y + seatHeight + this.PLAYER_HEIGHT - 0.2;
+    this.camera.position.set(sitX, sitY, sitZ);
+    this.controls.yaw = rot; this.controls.pitch = 0; this.controls._applyRotation();
+    this.playerFeetY = target.y + seatHeight - 0.2;
+    this.isSeated = true; this.isSleeping = false;
     if (this.playerAvatar) {
-      const piernaIzq = this.playerAvatar.userData.piernaIzq;
-      const piernaDer = this.playerAvatar.userData.piernaDer;
+      const piernaIzq = this.playerAvatar.userData.piernaIzq; const piernaDer = this.playerAvatar.userData.piernaDer;
+      if (piernaIzq) piernaIzq.rotation.x = -Math.PI / 2;
+      if (piernaDer) piernaDer.rotation.x = -Math.PI / 2;
+    }
+  } else if (kind === 'sleep') {
+    const bedHeight = target.obj.userData.seatHeight ?? 0.45;
+    const sitY = target.y + bedHeight + 0.4;
+    this.camera.position.set(target.x, sitY, target.z);
+    this.controls.yaw = rot + Math.PI / 2; this.controls.pitch = -0.4; this.controls._applyRotation();
+    this.playerFeetY = target.y + bedHeight;
+    this.isSleeping = true; this.isSeated = false;
+    if (this.playerAvatar) {
+      const piernaIzq = this.playerAvatar.userData.piernaIzq; const piernaDer = this.playerAvatar.userData.piernaDer;
       if (piernaIzq) piernaIzq.rotation.x = 0;
       if (piernaDer) piernaDer.rotation.x = 0;
     }
-    this._updateInteractBtn();
   }
+  this._updateInteractBtn();
+}
 
-  _updateInteractBtn() {
-    const btn = document.getElementById('interactBtn');
-    if (!btn) return;
-
-    if (this.isSeated || this.isSleeping) {
-      btn.textContent = '🛑 Levantarse';
-      btn.classList.add('visible');
-      return;
-    }
-
-    const nearby = this._findInteractableNearby(2.0);
-    if (nearby) {
-      const kind = nearby.obj.userData.interactive;
-      if (kind === 'seat') btn.textContent = '💬 Sentarse';
-      else if (kind === 'sleep') btn.textContent = '💬 Acostarse';
-      else if (kind === 'painting') btn.textContent = '🖼️ Configurar';
-      btn.classList.add('visible');
-    } else {
-      btn.classList.remove('visible');
-    }
+_standUp() {
+  if (this._savedStandPos) {
+    this.camera.position.set(this._savedStandPos.x, this._savedStandPos.y, this._savedStandPos.z);
+    this.playerFeetY = this._savedStandPos.y - this.PLAYER_HEIGHT;
+    this.playerVelY = 0;
   }
-
-  _buildSky() {
-    const skyGeo = new THREE.SphereGeometry(250, 32, 16);
-    this.skyMat = new THREE.ShaderMaterial({
-      side: THREE.BackSide,
-      uniforms: {
-        topColor:    { value: new THREE.Color(0x2d7ad6) },
-        bottomColor: { value: new THREE.Color(0xcfe4f5) },
-        offset:      { value: 20 },
-        exponent:    { value: 0.6 },
-      },
-      vertexShader: `
-        varying vec3 vWorldPosition;
-        void main() {
-          vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-          vWorldPosition = worldPosition.xyz;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform vec3 topColor;
-        uniform vec3 bottomColor;
-        uniform float offset;
-        uniform float exponent;
-        varying vec3 vWorldPosition;
-        void main() {
-          float h = normalize(vWorldPosition + vec3(0.0, offset, 0.0)).y;
-          gl_FragColor = vec4(mix(bottomColor, topColor, pow(max(h, 0.0), exponent)), 1.0);
-        }
-      `,
-    });
-    this.scene.add(new THREE.Mesh(skyGeo, this.skyMat));
-
-    this.sunMesh = this._makeSunSprite();
-    this.sunMesh.scale.set(28, 28, 1);
-    this.scene.add(this.sunMesh);
-
-    this.moonMesh = this._makeMoonSprite();
-    this.moonMesh.scale.set(16, 16, 1);
-    this.scene.add(this.moonMesh);
-
-    const starCount = 800;
-    const starGeo = new THREE.BufferGeometry();
-    const positions = new Float32Array(starCount * 3);
-    for (let i = 0; i < starCount; i++) {
-      const phi = Math.acos(2 * Math.random() - 1);
-      const theta = Math.random() * Math.PI * 2;
-      const r = 240;
-      positions[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
-      positions[i * 3 + 1] = Math.abs(r * Math.cos(phi)) + 20;
-      positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
-    }
-    starGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    this.starMat = new THREE.PointsMaterial({
-      color: 0xffffff, size: 1.2, transparent: true, opacity: 0,
-      sizeAttenuation: false,
-    });
-    this.stars = new THREE.Points(starGeo, this.starMat);
-    this.scene.add(this.stars);
+  if (this._savedStandRot) {
+    this.controls.yaw = this._savedStandRot.yaw; this.controls.pitch = this._savedStandRot.pitch; this.controls._applyRotation();
   }
-
-  _makeSunSprite() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 256; canvas.height = 256;
-    const ctx = canvas.getContext('2d');
-    const grad = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
-    grad.addColorStop(0.00, 'rgba(255, 252, 230, 1.00)');
-    grad.addColorStop(0.15, 'rgba(255, 248, 210, 0.95)');
-    grad.addColorStop(0.30, 'rgba(255, 235, 160, 0.55)');
-    grad.addColorStop(0.55, 'rgba(255, 215, 110, 0.20)');
-    grad.addColorStop(0.80, 'rgba(255, 200, 80, 0.05)');
-    grad.addColorStop(1.00, 'rgba(255, 190, 60, 0.00)');
-    ctx.fillStyle = grad; ctx.fillRect(0, 0, 256, 256);
-    ctx.beginPath(); ctx.arc(128, 128, 36, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(255, 255, 245, 1)'; ctx.fill();
-    ctx.strokeStyle = 'rgba(255, 245, 200, 0.35)'; ctx.lineWidth = 3; ctx.lineCap = 'round';
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * Math.PI * 2;
-      ctx.beginPath();
-      ctx.moveTo(128 + Math.cos(a) * 46, 128 + Math.sin(a) * 46);
-      ctx.lineTo(128 + Math.cos(a) * 68, 128 + Math.sin(a) * 68);
-      ctx.stroke();
-    }
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: true, blending: THREE.AdditiveBlending, fog: false });
-    return new THREE.Sprite(mat);
+  this.isSeated = false; this.isSleeping = false;
+  this._interactTarget = null; this._savedStandPos = null; this._savedStandRot = null;
+  if (this.playerAvatar) {
+    const piernaIzq = this.playerAvatar.userData.piernaIzq; const piernaDer = this.playerAvatar.userData.piernaDer;
+    if (piernaIzq) piernaIzq.rotation.x = 0;
+    if (piernaDer) piernaDer.rotation.x = 0;
   }
+  this._updateInteractBtn();
+}
 
-  _makeMoonSprite() {
-    const canvas = document.createElement('canvas');
-    canvas.width = 256; canvas.height = 256;
-    const ctx = canvas.getContext('2d');
-    const grad = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
-    grad.addColorStop(0.00, 'rgba(245, 250, 255, 1.00)');
-    grad.addColorStop(0.28, 'rgba(215, 230, 255, 0.85)');
-    grad.addColorStop(0.55, 'rgba(160, 195, 240, 0.25)');
-    grad.addColorStop(0.85, 'rgba(120, 160, 220, 0.05)');
-    grad.addColorStop(1.00, 'rgba(100, 140, 200, 0.00)');
-    ctx.fillStyle = grad; ctx.fillRect(0, 0, 256, 256);
-    ctx.beginPath(); ctx.arc(128, 128, 55, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(242, 246, 255, 1)'; ctx.fill();
-    ctx.fillStyle = 'rgba(200, 212, 232, 0.55)';
-    const craters = [[110, 110, 8], [140, 120, 6], [120, 145, 10], [150, 140, 5], [105, 130, 4], [130, 105, 5]];
-    for (const [cx, cy, r] of craters) {
-      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
-    }
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: true, fog: false });
-    return new THREE.Sprite(mat);
+_updateInteractBtn() {
+  const btn = document.getElementById('interactBtn');
+  if (!btn) return;
+  if (this.isSeated || this.isSleeping) { btn.textContent = '🛑 Levantarse'; btn.classList.add('visible'); return; }
+  const nearby = this._findInteractableNearby(2.0);
+  if (nearby) {
+    const kind = nearby.obj.userData.interactive;
+    if (kind === 'seat') btn.textContent = '💬 Sentarse';
+    else if (kind === 'sleep') btn.textContent = '💬 Acostarse';
+    else if (kind === 'painting') btn.textContent = '🖼️ Configurar';
+    btn.classList.add('visible');
+  } else {
+    btn.classList.remove('visible');
   }
+}
 
-  _createCloud() {
-    const group = new THREE.Group();
-    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0, emissive: 0x556677, emissiveIntensity: 0.15 });
-    const puffs = 4 + Math.floor(Math.random() * 6);
-    for (let i = 0; i < puffs; i++) {
-      const size = 3 + Math.random() * 5;
-      const geo = new THREE.SphereGeometry(size, 12, 10);
-      const puff = new THREE.Mesh(geo, mat);
-      puff.position.set((Math.random() - 0.5) * 18, (Math.random() - 0.5) * 3.5, (Math.random() - 0.5) * 12);
-      puff.scale.set(0.8 + Math.random() * 0.5, 0.6 + Math.random() * 0.3, 0.8 + Math.random() * 0.5);
-      group.add(puff);
-    }
-    return group;
-  }
+_buildSky() {
+  const skyGeo = new THREE.SphereGeometry(300, 32, 16);
+  this.skyMat = new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    uniforms: { topColor: { value: new THREE.Color(0x2d7ad6) }, bottomColor: { value: new THREE.Color(0xcfe4f5) }, offset: { value: 20 }, exponent: { value: 0.6 } },
+    vertexShader: `varying vec3 vWorldPosition; void main() { vec4 worldPosition = modelMatrix * vec4(position, 1.0); vWorldPosition = worldPosition.xyz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+    fragmentShader: `uniform vec3 topColor; uniform vec3 bottomColor; uniform float offset; uniform float exponent; varying vec3 vWorldPosition; void main() { float h = normalize(vWorldPosition + vec3(0.0, offset, 0.0)).y; gl_FragColor = vec4(mix(bottomColor, topColor, pow(max(h, 0.0), exponent)), 1.0); }`,
+  });
+  this.scene.add(new THREE.Mesh(skyGeo, this.skyMat));
 
-  _spawnCloud() {
-    const cloud = this._createCloud();
-    const half = 180;
-    const vx = Math.cos(this._windAngle) * this._windSpeed;
-    const vz = Math.sin(this._windAngle) * this._windSpeed;
-    const perpX = -vz / this._windSpeed; const perpZ =  vx / this._windSpeed;
-    const t = (Math.random() - 0.5) * half * 2;
-    const edgeX = -vx / this._windSpeed * half; const edgeZ = -vz / this._windSpeed * half;
-    const x = edgeX + perpX * t; const z = edgeZ + perpZ * t;
-    cloud.position.set(x, 45 + Math.random() * 25, z);
-    cloud.userData.vx = vx; cloud.userData.vz = vz;
-    this.scene.add(cloud); this.clouds.push(cloud);
+  this.sunMesh = this._makeSunSprite();
+this.sunMesh.scale.set(60, 60, 1);
+this.sunMesh.frustumCulled = false; // 🔥 NUNCA se oculta
+this.scene.add(this.sunMesh);
+
+this.moonMesh = this._makeMoonSprite();
+this.moonMesh.scale.set(30, 30, 1);
+this.moonMesh.frustumCulled = false; // 🔥 NUNCA se oculta
+this.scene.add(this.moonMesh);
+
+  const starCount = 800;
+  const starGeo = new THREE.BufferGeometry();
+  const positions = new Float32Array(starCount * 3);
+  for (let i = 0; i < starCount; i++) {
+    const phi = Math.acos(2 * Math.random() - 1);
+    const theta = Math.random() * Math.PI * 2;
+    const r = 240;
+    positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+    positions[i * 3 + 1] = Math.abs(r * Math.cos(phi)) + 20;
+    positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
   }
+  starGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  this.starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 1.2, transparent: true, opacity: 0, sizeAttenuation: false });
+  this.stars = new THREE.Points(starGeo, this.starMat);
+  this.scene.add(this.stars);
+}
+
+_makeSunSprite() {
+  const canvas = document.createElement('canvas'); 
+  canvas.width = 512; 
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  
+  // Degradado radial para el halo del sol
+  const grad = ctx.createRadialGradient(256, 256, 0, 256, 256, 256);
+  grad.addColorStop(0.00, 'rgba(255, 255, 255, 1.00)');
+  grad.addColorStop(0.10, 'rgba(255, 255, 255, 1.00)');
+  grad.addColorStop(0.25, 'rgba(255, 250, 210, 0.90)');
+  grad.addColorStop(0.45, 'rgba(255, 230, 140, 0.40)');
+  grad.addColorStop(0.75, 'rgba(255, 200, 80, 0.10)');
+  grad.addColorStop(1.00, 'rgba(255, 180, 60, 0.00)');
+  
+  ctx.fillStyle = grad; 
+  ctx.fillRect(0, 0, 512, 512);
+  
+  // Núcleo blanco puro
+  ctx.beginPath(); 
+  ctx.arc(256, 256, 80, 0, Math.PI * 2); 
+  ctx.fillStyle = 'rgba(255, 255, 255, 1)'; 
+  ctx.fill();
+  
+  // Rayos de luz
+  ctx.strokeStyle = 'rgba(255, 250, 220, 0.6)'; 
+  ctx.lineWidth = 4; 
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 12; i++) {
+    const a = (i / 12) * Math.PI * 2;
+    ctx.beginPath(); 
+    ctx.moveTo(256 + Math.cos(a) * 90, 256 + Math.sin(a) * 90); 
+    ctx.lineTo(256 + Math.cos(a) * 160, 256 + Math.sin(a) * 160); 
+    ctx.stroke();
+  }
+  
+  const tex = new THREE.CanvasTexture(canvas); 
+  tex.colorSpace = THREE.SRGBColorSpace;
+  
+  return new THREE.Sprite(new THREE.SpriteMaterial({ 
+    map: tex, 
+    transparent: true, 
+    depthWrite: false, 
+    depthTest: true, 
+    blending: THREE.AdditiveBlending, 
+    fog: false,
+    toneMapped: false 
+  }));
+}
+
+
+_makeMoonSprite() {
+  const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+  grad.addColorStop(0.00, 'rgba(245, 250, 255, 1.00)'); grad.addColorStop(0.28, 'rgba(215, 230, 255, 0.85)'); grad.addColorStop(0.55, 'rgba(160, 195, 240, 0.25)'); grad.addColorStop(0.85, 'rgba(120, 160, 220, 0.05)'); grad.addColorStop(1.00, 'rgba(100, 140, 200, 0.00)');
+  ctx.fillStyle = grad; ctx.fillRect(0, 0, 256, 256);
+  ctx.beginPath(); ctx.arc(128, 128, 55, 0, Math.PI * 2); ctx.fillStyle = 'rgba(242, 246, 255, 1)'; ctx.fill();
+  ctx.fillStyle = 'rgba(200, 212, 232, 0.55)';
+  const craters = [[110, 110, 8], [140, 120, 6], [120, 145, 10], [150, 140, 5], [105, 130, 4], [130, 105, 5]];
+  for (const [cx, cy, r] of craters) { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); }
+  const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: true, fog: false }));
+}
+
+_createCloud() {
+  const group = new THREE.Group();
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0, emissive: 0x556677, emissiveIntensity: 0.15 });
+  const puffs = 4 + Math.floor(Math.random() * 6);
+  for (let i = 0; i < puffs; i++) {
+    const size = 3 + Math.random() * 5;
+    const geo = new THREE.SphereGeometry(size, 12, 10);
+    const puff = new THREE.Mesh(geo, mat);
+    puff.position.set((Math.random() - 0.5) * 18, (Math.random() - 0.5) * 3.5, (Math.random() - 0.5) * 12);
+    puff.scale.set(0.8 + Math.random() * 0.5, 0.6 + Math.random() * 0.3, 0.8 + Math.random() * 0.5);
+    group.add(puff);
+  }
+  return group;
+}
+
+_spawnCloud() {
+  const cloud = this._createCloud();
+  const half = 180;
+  const vx = Math.cos(this._windAngle) * this._windSpeed;
+  const vz = Math.sin(this._windAngle) * this._windSpeed;
+  const perpX = -vz / this._windSpeed; const perpZ = vx / this._windSpeed;
+  const t = (Math.random() - 0.5) * half * 2;
+  const edgeX = -vx / this._windSpeed * half; const edgeZ = -vz / this._windSpeed * half;
+  const x = edgeX + perpX * t; const z = edgeZ + perpZ * t;
+  cloud.position.set(x, 45 + Math.random() * 25, z);
+  cloud.userData.vx = vx; cloud.userData.vz = vz;
+  this.scene.add(cloud); this.clouds.push(cloud);
+}
+
 _prefillClouds() {
-  // Genera muchas nubes esparcidas por un área MUY grande (200x200)
   for (let i = 0; i < 25; i++) {
     const cloud = this._createCloud();
-    // Distribución uniforme en un área de 200x200
-    const x = (Math.random() - 0.5) * 200;
-    const z = (Math.random() - 0.5) * 200;
-    const y = 45 + Math.random() * 30; // Altura variada para que no se vean planas
-    
-    cloud.position.set(x, y, z);
-    
-    const vx = Math.cos(this._windAngle) * this._windSpeed;
-    const vz = Math.sin(this._windAngle) * this._windSpeed;
-    cloud.userData.vx = vx;
-    cloud.userData.vz = vz;
-    
-    // Escala aleatoria para más variedad
+    cloud.position.set((Math.random() - 0.5) * 200, 45 + Math.random() * 30, (Math.random() - 0.5) * 200);
+    cloud.userData.vx = Math.cos(this._windAngle) * this._windSpeed;
+    cloud.userData.vz = Math.sin(this._windAngle) * this._windSpeed;
     const scale = 0.8 + Math.random() * 0.8;
     cloud.scale.set(scale, scale, scale);
-    
-    this.scene.add(cloud);
-    this.clouds.push(cloud);
+    this.scene.add(cloud); this.clouds.push(cloud);
   }
 }
-  _updateClouds(dt) {
-    const half = 180;
-    const vx = Math.cos(this._windAngle) * this._windSpeed;
-    const vz = Math.sin(this._windAngle) * this._windSpeed;
-    this._cloudWaveTimer -= dt;
-    if (this._cloudWaveTimer <= 0) {
-      const waveSize = 1 + Math.floor(Math.random() * 4);
-      for (let i = 0; i < waveSize; i++) setTimeout(() => this._spawnCloud(), i * (100 + Math.random() * 300));
-      this._cloudWaveTimer = 3 + Math.random() * 6;
-    }
-    for (let i = this.clouds.length - 1; i >= 0; i--) {
-      const c = this.clouds[i];
-      c.position.x += vx * dt; c.position.z += vz * dt;
-      if (Math.abs(c.position.x) > half + 30 || Math.abs(c.position.z) > half + 30) {
-        this.scene.remove(c); this.clouds.splice(i, 1);
-      }
+
+_updateClouds(dt) {
+  const half = 180;
+  const vx = Math.cos(this._windAngle) * this._windSpeed;
+  const vz = Math.sin(this._windAngle) * this._windSpeed;
+  this._cloudWaveTimer -= dt;
+  if (this._cloudWaveTimer <= 0) {
+    const waveSize = 1 + Math.floor(Math.random() * 4);
+    for (let i = 0; i < waveSize; i++) setTimeout(() => this._spawnCloud(), i * (100 + Math.random() * 300));
+    this._cloudWaveTimer = 3 + Math.random() * 6;
+  }
+  for (let i = this.clouds.length - 1; i >= 0; i--) {
+    const c = this.clouds[i];
+    c.position.x += vx * dt; c.position.z += vz * dt;
+    if (Math.abs(c.position.x) > half + 30 || Math.abs(c.position.z) > half + 30) {
+      this.scene.remove(c); this.clouds.splice(i, 1);
     }
   }
-
-  _lights() {
-    const isHigh = this.save.quality === 'alta';
-    const isLow = this.save.quality === 'baja';
-
-    this.hemi = new THREE.HemisphereLight(0xd8e8f5, 0x6a7050, 0);
-    this.scene.add(this.hemi);
-
-    this.sunLight = new THREE.DirectionalLight(0xfff0d0, 0);
-    this.sunLight.position.set(70, 90, 40);
-    this.sunLight.castShadow = !isLow;
-    
-    if (this.sunLight.castShadow) {
-      const shadowSize = isHigh ? 2048 : 1024; 
-      this.sunLight.shadow.mapSize.set(shadowSize, shadowSize);
-      const d = isHigh ? 45 : 35;
-      this.sunLight.shadow.camera.left = -d; this.sunLight.shadow.camera.right = d;
-      this.sunLight.shadow.camera.top = d; this.sunLight.shadow.camera.bottom = -d;
-      this.sunLight.shadow.camera.near = 1; this.sunLight.shadow.camera.far = 200;
-      this.sunLight.shadow.bias = -0.001; 
-      this.sunLight.shadow.normalBias = 0.08; 
-    }
-    this.scene.add(this.sunLight);
-
-    this.fill = new THREE.DirectionalLight(0xb0d0ff, 0);
-    this.fill.position.set(-50, 40, -30);
-    this.scene.add(this.fill);
-
-    this.ambientNight = new THREE.AmbientLight(0x3a4560, 0);
-    this.scene.add(this.ambientNight);
-
-    this.moonLight = new THREE.DirectionalLight(0x9ab8e8, 0);
-    this.moonLight.position.set(-70, 90, -40);
-    this.moonLight.castShadow = false; 
-    this.scene.add(this.moonLight);
-  }
-
-  _addBox(w, h, d, x, y, z, color, opts = {}) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...opts }));
-    m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
-    this.scene.add(m); return m;
-  }
-
-  _buildNeighborhood() {
-    const HALF = this.HALF;
-    const WALL_H = this.WALL_H;
-    const quality = this.save.quality;
-
-    const grassMat = new THREE.MeshStandardMaterial({ 
-      color: 0x4a7a4a, 
-      roughness: 1.0, 
-      metalness: 0.0
-    });
-    
-    if (quality === 'alta') {
-      const c = document.createElement('canvas');
-      c.width = 256; c.height = 256;
-      const ctx = c.getContext('2d');
-      ctx.fillStyle = '#4a7a4a'; ctx.fillRect(0, 0, 256, 256);
-      for (let i = 0; i < 2000; i++) {
-        ctx.fillStyle = Math.random() > 0.5 ? '#558a55' : '#3d6a3d';
-        ctx.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
-      }
-      const tex = new THREE.CanvasTexture(c);
-      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-      tex.repeat.set(20, 20);
-      grassMat.map = tex;
-    }
-
-    const grass = new THREE.Mesh(new THREE.PlaneGeometry(HALF * 2, HALF * 2), grassMat);
-    grass.rotation.x = -Math.PI / 2;
-    grass.receiveShadow = false;
-    this.scene.add(grass);
-    this.grass = grass;
-
-    const roadMat = new THREE.MeshStandardMaterial({ color: 0x3a3f47, roughness: 1.0 });
-    const roadH = new THREE.Mesh(new THREE.PlaneGeometry(HALF * 2, 6), roadMat);
-    roadH.rotation.x = -Math.PI / 2; roadH.position.y = 0.02; roadH.receiveShadow = true;
-    this.scene.add(roadH);
-
-    const roadV = new THREE.Mesh(new THREE.PlaneGeometry(6, HALF * 2), roadMat);
-    roadV.rotation.x = -Math.PI / 2; roadV.position.y = 0.02; roadV.receiveShadow = true;
-    this.scene.add(roadV);
-
-    const lineMat = new THREE.MeshBasicMaterial({ color: 0xf0e0a0 });
-    for (let i = -HALF + 2; i < HALF; i += 4) {
-      if (Math.abs(i) < 4) continue;
-      const s1 = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.12), lineMat);
-      s1.rotation.x = -Math.PI / 2; s1.position.set(i, 0.03, 0); this.scene.add(s1);
-      const s2 = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 1.6), lineMat);
-      s2.rotation.x = -Math.PI / 2; s2.position.set(0, 0.03, i); this.scene.add(s2);
-    }
-
-    const wallColor = 0x8a7a68;
-    const t = this._wallThickness.perimeter;
-    this._addBox(HALF * 2, WALL_H, t, 0, WALL_H / 2, -HALF, wallColor);
-    this._addBox(HALF * 2, WALL_H, t, 0, WALL_H / 2,  HALF, wallColor);
-    this._addBox(t, WALL_H, HALF * 2, -HALF, WALL_H / 2, 0, wallColor);
-    this._addBox(t, WALL_H, HALF * 2,  HALF, WALL_H / 2, 0, wallColor);
-
-    const capColor = 0xa89880;
-    this._addBox(HALF * 2 + 0.4, 0.3, t + 0.4, 0, WALL_H + 0.15, -HALF, capColor);
-    this._addBox(HALF * 2 + 0.4, 0.3, t + 0.4, 0, WALL_H + 0.15,  HALF, capColor);
-    this._addBox(t + 0.4, 0.3, HALF * 2 + 0.4, -HALF, WALL_H + 0.15, 0, capColor);
-    this._addBox(t + 0.4, 0.3, HALF * 2 + 0.4,  HALF, WALL_H + 0.15, 0, capColor);
-
-    for (const plot of this.plots) {
-      const pad = new THREE.Mesh(
-        new THREE.PlaneGeometry(this.PLOT_SIZE, this.PLOT_SIZE),
-        new THREE.MeshStandardMaterial({ color: 0x7a8a5a, roughness: 1.0 })
-      );
-      pad.rotation.x = -Math.PI / 2; pad.position.set(plot.cx, 0.04, plot.cz); pad.receiveShadow = true;
-      this.scene.add(pad); plot.half = this.PLOT_SIZE / 2;
-      plot.padMesh = pad; 
-    }
-
-    this.streetLamps = [];
-    
-    const glowCanvas = document.createElement('canvas');
-    glowCanvas.width = 64; glowCanvas.height = 64;
-    const glowCtx = glowCanvas.getContext('2d');
-    const glowGrad = glowCtx.createRadialGradient(32, 32, 0, 32, 32, 32);
-    glowGrad.addColorStop(0, 'rgba(255, 220, 130, 0.8)');
-    glowGrad.addColorStop(0.4, 'rgba(255, 200, 100, 0.2)');
-    glowGrad.addColorStop(1, 'rgba(255, 180, 80, 0)');
-    glowCtx.fillStyle = glowGrad;
-    glowCtx.fillRect(0, 0, 64, 64);
-    const glowTexture = new THREE.CanvasTexture(glowCanvas);
-    
-    const fakeLightMat = new THREE.MeshBasicMaterial({ 
-      map: glowTexture, 
-      transparent: true, 
-      depthWrite: false, 
-      blending: THREE.AdditiveBlending 
-    });
-
-    for (const [x, z] of [[-5, -5], [5, -5], [-5, 5], [5, 5]]) {
-      this._addBox(0.15, 3.2, 0.15, x, 1.6, z, 0x333333);
-      const bulbMat = new THREE.MeshStandardMaterial({ color: 0xfff2c0, emissive: 0xffe4a0, emissiveIntensity: 3.0, roughness: 0.3 });
-      const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.28, 14, 12), bulbMat);
-      bulb.position.set(x, 3.4, z); 
-      this.scene.add(bulb);
-      this._addBox(0.5, 0.15, 0.5, x, 3.65, z, 0x222222);
-      
-      const fakeHalo = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), fakeLightMat);
-      fakeHalo.rotation.x = -Math.PI / 2;
-      fakeHalo.position.set(x, 0.06, z);
-      this.scene.add(fakeHalo);
-      
-      this.streetLamps.push({ light: null, bulb: bulb, halo: fakeHalo });
-    }
-  }
-
-  _updateDayCycle(dt) {
-    this.dayTime = (this.dayTime + this.daySpeed * dt) % 1;
-    const sunAngle = this.dayTime * Math.PI * 2 - Math.PI / 2;
-    const R = 120;
-    const sunX = Math.cos(sunAngle) * R;
-    const sunY = Math.sin(sunAngle) * R;
-    const sunZ = Math.cos(sunAngle * 0.5) * 40;
-    this.sunMesh.position.set(sunX, sunY, sunZ);
-    const moonX = -sunX; const moonY = -sunY; const moonZ = -sunZ;
-    this.moonMesh.position.set(moonX, moonY, moonZ);
-    this.sunLight.position.set(sunX, Math.max(sunY, 1), sunZ);
-
-    this._lastShadowUpdate++;
-    if (this._lastShadowUpdate >= 90) {
-      this._lastShadowUpdate = 0;
-      if (this.renderer && this.renderer.shadowMap) this.renderer.shadowMap.needsUpdate = true;
-    }
-
-    const sunHeight = sunY / R;
-    const isDay = sunHeight > 0;
-    const dayFactor = Math.max(0, sunHeight);
-    const isHigh = this.save.quality === 'alta';
-
-    this.sunLight.intensity = isDay ? 0.5 + dayFactor * 1.5 : 0;
-    if (isDay) {
-      const warmth = Math.max(0, 1 - sunHeight * 2.5);
-      this.sunLight.color.setRGB(1, 0.97 - warmth * 0.15, 0.88 - warmth * 0.55);
-    }
-    const ambientBase = isHigh ? 0.4 : 0.3;
-    this.hemi.intensity = isDay ? ambientBase + dayFactor * 0.5 : 0;
-    this.fill.intensity = isDay ? (isHigh ? 0.35 : 0.2) + dayFactor * 0.2 : 0;
-    const isNight = sunHeight < 0;
-    this.ambientNight.intensity = isNight ? 0.25 + (-sunHeight) * 0.2 : 0;
-
-    if (isNight) {
-      const moonHeight = -sunHeight;
-      this.moonLight.intensity = 0.6 + moonHeight * 0.8; 
-      this.moonLight.position.set(moonX, Math.max(moonY, 1), moonZ);
-    } else {
-      this.moonLight.intensity = 0;
-    }
-
-    if (this.streetLamps) {
-      const isNightLamp = sunHeight < 0.1;
-      for (const l of this.streetLamps) {
-        if (l.bulb) l.bulb.material.emissiveIntensity = isNightLamp ? 3.0 : 0;
-        if (l.halo) l.halo.visible = isNightLamp;
-      }
-    }
-
-    const dayTop = new THREE.Color(0x2d7ad6); const dayBottom = new THREE.Color(0xcfe4f5);
-    const duskTop = new THREE.Color(0x2a1a4a); const duskBottom = new THREE.Color(0xff8a4a);
-    const nightTop = new THREE.Color(0x050510); const nightBottom = new THREE.Color(0x101830);
-    let top, bottom;
-    if (isDay) {
-      if (sunHeight > 0.3) { top = dayTop.clone(); bottom = dayBottom.clone(); }
-      else {
-        const t = sunHeight / 0.3;
-        top = duskTop.clone().lerp(dayTop, t); bottom = duskBottom.clone().lerp(dayBottom, t);
-      }
-    } else {
-      if (sunHeight > -0.2) {
-        const t = (sunHeight + 0.2) / 0.2;
-        top = nightTop.clone().lerp(duskTop, t); bottom = nightBottom.clone().lerp(duskBottom, t);
-      } else { top = nightTop.clone(); bottom = nightBottom.clone(); }
-    }
-    this.skyMat.uniforms.topColor.value.copy(top);
-    this.skyMat.uniforms.bottomColor.value.copy(bottom);
-    if (this.scene.fog) this.scene.fog.color.copy(bottom);
-
-    this.sunMesh.visible = sunY > -15;
-    this.sunMesh.material.opacity = Math.max(0, Math.min(1, (sunY + 15) / 30));
-    this.moonMesh.visible = moonY > -15;
-    this.moonMesh.material.opacity = Math.max(0, Math.min(1, (moonY + 15) / 30));
-    this.starMat.opacity = Math.min(1, Math.max(0, -sunHeight * 2));
-
-    // --- COLOR DE LAS NUBES SEGÚN CLIMA Y HORA ---
-const weatherDarkness = this.weatherIntensity;
-for (const c of this.clouds) {
-  c.traverse(o => {
-    if (o.isMesh && o.material && o.material.color) {
-      const baseWhite = new THREE.Color(1, 1, 1); 
-      const duskTint = new THREE.Color(1, 0.7, 0.5);
-      const nightTint = new THREE.Color(0.35, 0.4, 0.55); 
-      const stormTint = new THREE.Color(0.15, 0.17, 0.22); // Nubes de tormenta MUY oscuras
-      
-      let target;
-      if (isDay && sunHeight > 0.3) target = baseWhite.clone();
-      else if (sunHeight > -0.1) {
-        const t = Math.max(0, Math.min(1, (sunHeight + 0.1) / 0.4));
-        target = nightTint.clone().lerp(duskTint, t);
-      } else target = nightTint.clone();
-      
-      // Mezclar con el color de tormenta
-      target.lerp(stormTint, weatherDarkness * 0.9);
-      o.material.color.copy(target);
-    }
-  });
 }
 
-    const clockEl = document.getElementById('clock');
-    if (clockEl) {
-      const hours = Math.floor(this.dayTime * 24);
-      const mins = Math.floor((this.dayTime * 24 - hours) * 60);
-      clockEl.textContent = `🕐 ${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
-    }
+_lights() {
+  const isHigh = this.save.quality === 'alta' || this.save.quality === 'ultra';
+  const isLow = this.save.quality === 'baja';
 
-      // --- CLIMA: OSCURECER Y PONER CIELO GRIS ---
+  this.hemi = new THREE.HemisphereLight(0xd8e8f5, 0x6a7050, 0);
+  this.scene.add(this.hemi);
+
+  this.sunLight = new THREE.DirectionalLight(0xfff0d0, 0);
+  this.sunLight.position.set(70, 90, 40);
+  this.sunLight.castShadow = !isLow;
+
+  if (this.sunLight.castShadow) {
+    const shadowSize = isHigh ? 2048 : 1024;
+    this.sunLight.shadow.mapSize.set(shadowSize, shadowSize);
+    const d = 40;
+    this.sunLight.shadow.camera.left = -d;
+    this.sunLight.shadow.camera.right = d;
+    this.sunLight.shadow.camera.top = d;
+    this.sunLight.shadow.camera.bottom = -d;
+    this.sunLight.shadow.camera.near = 1;
+    this.sunLight.shadow.camera.far = 200;
+    this.sunLight.shadow.bias = -0.0005;
+    this.sunLight.shadow.normalBias = 0.05;
+  }
+  this.scene.add(this.sunLight);
+  this.scene.add(this.sunLight.target);
+
+  this.fill = new THREE.DirectionalLight(0xb0d0ff, 0);
+  this.fill.position.set(-50, 40, -30);
+  this.scene.add(this.fill);
+
+  this.ambientNight = new THREE.AmbientLight(0x3a4560, 0);
+  this.scene.add(this.ambientNight);
+
+  this.moonLight = new THREE.DirectionalLight(0x9ab8e8, 0);
+  this.moonLight.position.set(-70, 90, -40);
+  this.moonLight.castShadow = false;
+  this.scene.add(this.moonLight);
+}
+
+_addBox(w, h, d, x, y, z, color, opts = {}) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...opts }));
+  m.position.set(x, y, z); m.castShadow = true; m.receiveShadow = true;
+  this.scene.add(m); return m;
+}
+
+_buildNeighborhood() {
+  const HALF = this.HALF;
+  const roadMat = new THREE.MeshStandardMaterial({ color: 0x3a3f47, roughness: 1.0 });
+  const roadH = new THREE.Mesh(new THREE.PlaneGeometry(HALF * 2, 6), roadMat);
+  roadH.rotation.x = -Math.PI / 2; roadH.position.y = 0.02; roadH.receiveShadow = true; this.scene.add(roadH);
+  const roadV = new THREE.Mesh(new THREE.PlaneGeometry(6, HALF * 2), roadMat);
+  roadV.rotation.x = -Math.PI / 2; roadV.position.y = 0.02; roadV.receiveShadow = true; this.scene.add(roadV);
+
+  const lineMat = new THREE.MeshBasicMaterial({ color: 0xf0e0a0 });
+  for (let i = -HALF + 2; i < HALF; i += 4) {
+    if (Math.abs(i) < 4) continue;
+    const s1 = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.12), lineMat);
+    s1.rotation.x = -Math.PI / 2; s1.position.set(i, 0.03, 0); this.scene.add(s1);
+    const s2 = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 1.6), lineMat);
+    s2.rotation.x = -Math.PI / 2; s2.position.set(0, 0.03, i); this.scene.add(s2);
+  }
+
+  for (const plot of this.plots) {
+    const pad = new THREE.Mesh(new THREE.PlaneGeometry(this.PLOT_SIZE, this.PLOT_SIZE), new THREE.MeshStandardMaterial({ color: 0x7a8a5a, roughness: 1.0 }));
+    pad.rotation.x = -Math.PI / 2;
+    const padY = this.terrain ? this.terrain.getHeightAt(plot.cx, plot.cz) : 0.05;
+    pad.position.set(plot.cx, padY + 0.02, plot.cz);
+    pad.receiveShadow = true;
+    this.scene.add(pad); plot.half = this.PLOT_SIZE / 2; plot.padMesh = pad;
+  }
+
+  this.streetLamps = [];
+  const glowCanvas = document.createElement('canvas'); glowCanvas.width = 64; glowCanvas.height = 64;
+  const glowCtx = glowCanvas.getContext('2d');
+  const glowGrad = glowCtx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  glowGrad.addColorStop(0, 'rgba(255, 220, 130, 0.8)'); glowGrad.addColorStop(0.4, 'rgba(255, 200, 100, 0.2)'); glowGrad.addColorStop(1, 'rgba(255, 180, 80, 0)');
+  glowCtx.fillStyle = glowGrad; glowCtx.fillRect(0, 0, 64, 64);
+  const glowTexture = new THREE.CanvasTexture(glowCanvas);
+  const fakeLightMat = new THREE.MeshBasicMaterial({ map: glowTexture, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+
+  for (const [x, z] of [[-5, -5], [5, -5], [-5, 5], [5, 5]]) {
+    this._addBox(0.15, 3.2, 0.15, x, 1.6, z, 0x333333);
+    const bulbMat = new THREE.MeshStandardMaterial({ color: 0xfff2c0, emissive: 0xffe4a0, emissiveIntensity: 3.0, roughness: 0.3 });
+    const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.28, 14, 12), bulbMat);
+    bulb.position.set(x, 3.4, z); this.scene.add(bulb);
+    this._addBox(0.5, 0.15, 0.5, x, 3.65, z, 0x222222);
+    const fakeHalo = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), fakeLightMat);
+    fakeHalo.rotation.x = -Math.PI / 2; fakeHalo.position.set(x, 0.06, z); this.scene.add(fakeHalo);
+    this.streetLamps.push({ light: null, bulb: bulb, halo: fakeHalo });
+  }
+}
+
+_updateDayCycle(dt) {
+  this.dayTime = (this.dayTime + this.daySpeed * dt) % 1;
+  const sunAngle = this.dayTime * Math.PI * 2 - Math.PI / 2;
+  const R = 120;
+
+  const sunX = Math.cos(sunAngle) * R;
+  const sunY = Math.sin(sunAngle) * R;
+  const sunZ = Math.cos(sunAngle * 0.5) * 40;
+
+  this.sunLight.position.set(
+    this.camera.position.x + sunX,
+    Math.max(sunY, 1),
+    this.camera.position.z + sunZ
+  );
+
+  this.sunLight.target.position.set(
+    this.camera.position.x,
+    0,
+    this.camera.position.z
+  );
+  this.sunLight.target.updateMatrixWorld();
+
+  if (this.renderer && this.renderer.shadowMap) {
+    this.renderer.shadowMap.needsUpdate = true;
+  }
+
+  const visualDistance = 150;
+  const normX = sunX / R;
+  const normY = sunY / R;
+  const normZ = sunZ / R;
+
+  this.sunMesh.position.set(
+    this.camera.position.x + normX * visualDistance,
+    normY * visualDistance,
+    this.camera.position.z + normZ * visualDistance
+  );
+
+  this.moonMesh.position.set(
+    this.camera.position.x - normX * visualDistance,
+    -normY * visualDistance,
+    this.camera.position.z - normZ * visualDistance
+  );
+
+  this.sunMesh.scale.set(20, 20, 1);
+  this.moonMesh.scale.set(12, 12, 1);
+
+  if (this.sunMesh.material) {
+    this.sunMesh.material.fog = false;
+    this.sunMesh.material.depthTest = true;
+    this.sunMesh.material.opacity = 1;
+  }
+  if (this.moonMesh.material) {
+    this.moonMesh.material.fog = false;
+    this.moonMesh.material.depthTest = true;
+  }
+
+  const sunHeight = sunY / R;
+  const isDay = sunHeight > 0;
+  const dayFactor = Math.max(0, sunHeight);
+  const isHigh = this.save.quality === 'alta' || this.save.quality === 'ultra';
+
+  this.sunLight.intensity = isDay ? 0.5 + dayFactor * 1.5 : 0;
+  if (isDay) {
+    const warmth = Math.max(0, 1 - sunHeight * 2.5);
+    this.sunLight.color.setRGB(1, 0.97 - warmth * 0.15, 0.88 - warmth * 0.55);
+  }
+  const ambientBase = isHigh ? 0.4 : 0.3;
+  this.hemi.intensity = isDay ? ambientBase + dayFactor * 0.5 : 0;
+  this.fill.intensity = isDay ? (isHigh ? 0.35 : 0.2) + dayFactor * 0.2 : 0;
+
+  const isNight = sunHeight < 0;
+  this.ambientNight.intensity = isNight ? 0.25 + (-sunHeight) * 0.2 : 0;
+
+  if (isNight) {
+    const moonHeight = -sunHeight;
+    this.moonLight.intensity = 0.6 + moonHeight * 0.8;
+    this.moonLight.position.set(-sunX, Math.max(-sunY, 1), -sunZ);
+  } else {
+    this.moonLight.intensity = 0;
+  }
+
+  if (this.streetLamps) {
+    const isNightLamp = sunHeight < 0.1;
+    for (const l of this.streetLamps) {
+      if (l.bulb) l.bulb.material.emissiveIntensity = isNightLamp ? 3.0 : 0;
+      if (l.halo) l.halo.visible = isNightLamp;
+    }
+  }
+
+  const dayTop = new THREE.Color(0x2d7ad6); const dayBottom = new THREE.Color(0xcfe4f5);
+  const duskTop = new THREE.Color(0x2a1a4a); const duskBottom = new THREE.Color(0xff8a4a);
+  const nightTop = new THREE.Color(0x050510); const nightBottom = new THREE.Color(0x101830);
+  let top, bottom;
+
+  if (isDay) {
+    if (sunHeight > 0.3) { top = dayTop.clone(); bottom = dayBottom.clone(); }
+    else {
+      const t = sunHeight / 0.3;
+      top = duskTop.clone().lerp(dayTop, t); bottom = duskBottom.clone().lerp(dayBottom, t);
+    }
+  } else {
+    if (sunHeight > -0.2) {
+      const t = (sunHeight + 0.2) / 0.2;
+      top = nightTop.clone().lerp(duskTop, t); bottom = nightBottom.clone().lerp(duskBottom, t);
+    } else { top = nightTop.clone(); bottom = nightBottom.clone(); }
+  }
+
+  this.skyMat.uniforms.topColor.value.copy(top);
+  this.skyMat.uniforms.bottomColor.value.copy(bottom);
+  if (this.scene.fog) this.scene.fog.color.copy(bottom);
+
+  this.sunMesh.visible = sunY > -15;
+  this.sunMesh.material.opacity = Math.max(0, Math.min(1, (sunY + 15) / 30));
+  this.moonMesh.visible = -sunY > -15;
+  this.moonMesh.material.opacity = Math.max(0, Math.min(1, (-sunY + 15) / 30));
+  this.starMat.opacity = Math.min(1, Math.max(0, -sunHeight * 2));
+
+  const weatherDarkness = this.weatherIntensity;
+  for (const c of this.clouds) {
+    c.traverse(o => {
+      if (o.isMesh && o.material && o.material.color) {
+        const baseWhite = new THREE.Color(1, 1, 1);
+        const duskTint = new THREE.Color(1, 0.7, 0.5);
+        const nightTint = new THREE.Color(0.35, 0.4, 0.55);
+        const stormTint = new THREE.Color(0.15, 0.17, 0.22);
+        let target;
+        if (isDay && sunHeight > 0.3) target = baseWhite.clone();
+        else if (sunHeight > -0.1) {
+          const t = Math.max(0, Math.min(1, (sunHeight + 0.1) / 0.4));
+          target = nightTint.clone().lerp(duskTint, t);
+        } else target = nightTint.clone();
+        target.lerp(stormTint, weatherDarkness * 0.9);
+        o.material.color.copy(target);
+      }
+    });
+  }
+
+  const clockEl = document.getElementById('clock');
+  if (clockEl) {
+    const hours = Math.floor(this.dayTime * 24);
+    const mins = Math.floor((this.dayTime * 24 - hours) * 60);
+    clockEl.textContent = `🕐 ${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+  }
+
   const badWeather = this.weatherIntensity;
   if (badWeather > 0.01) {
-    // Gris de tormenta
     const stormGreyTop = new THREE.Color(0x4a5568);
     const stormGreyBottom = new THREE.Color(0x718096);
-    
     this.skyMat.uniforms.topColor.value.lerp(stormGreyTop, badWeather * 0.8);
     this.skyMat.uniforms.bottomColor.value.lerp(stormGreyBottom, badWeather * 0.8);
-
-    // Apagar luces progresivamente
     if (this.sunLight) this.sunLight.intensity *= (1 - badWeather * 0.7);
     if (this.hemi) this.hemi.intensity *= (1 - badWeather * 0.5);
   }
 
-  // Destello de relámpago
   if (this._stormFlashActive && this.sunLight) {
     this.sunLight.intensity += 4.0;
   }
 }
-
   _loadFurniture() {
     for (const item of (this.save.placedFurniture ?? [])) {
       const obj = createFurniture(item.type, item.color ?? null, item.style ?? null, this.save.quality);
@@ -1233,7 +1077,6 @@ for (const c of this.clouds) {
       obj.position.y = y;
       this.scene.add(obj);
 
-      // Parche Z-Fighting
       if (item.type.startsWith('muro')) {
         obj.traverse(child => {
           if (child.isMesh && child.material) {
@@ -1247,7 +1090,7 @@ for (const c of this.clouds) {
       const rec = {
         type: item.type, obj, x: item.x, y: y, z: item.z, rotY: item.rotY ?? 0,
         radius: this._radiusFor(item.type), color: item.color ?? null,
-        style: item.style ?? null, tvUrl: item.tvUrl ?? null, tvTime: item.tvTime ?? 0,
+        style: item.style ?? null, tvUrl: item.tvUrl ?? null, tvTime: 0,
       };
       this.placed.push(rec);
 
@@ -1261,6 +1104,7 @@ for (const c of this.clouds) {
     if (type.startsWith('muro') || type === 'techo_basico') return 2.0;
     if (type.startsWith('escalera')) return 1.2;
     if (type === 'arbol_grande') return 0.9;
+    if (type === 'arbol_muerto') return 0.7;
     if (type === 'arbol_chico')  return 0.6;
     if (type === 'arbusto')      return 0.4;
     if (type === 'planta_maceta')return 0.25;
@@ -1301,18 +1145,13 @@ for (const c of this.clouds) {
     return 0.4;
   }
 
-  _depthFor(type) {
-    return this._depthByType[type] ?? 0.4;
-  }
+  _depthFor(type) { return this._depthByType[type] ?? 0.4; }
 
   _originFor(id) {
     if (this._originAt[id]) return this._originAt[id];
     try {
       const probe = createFurniture(id, null, null, this.save.quality);
-      if (probe?.userData?.originAt) {
-        this._originAt[id] = probe.userData.originAt;
-        return this._originAt[id];
-      }
+      if (probe?.userData?.originAt) { this._originAt[id] = probe.userData.originAt; return this._originAt[id]; }
     } catch (_) {}
     return 'center';
   }
@@ -1357,12 +1196,7 @@ for (const c of this.clouds) {
   _applyPlotFloor(idx, type, save = true, color = null) {
     const plot = this.plots[idx];
     if (!plot) return;
-
-    if (this._floorMeshes[idx]) {
-      this.scene.remove(this._floorMeshes[idx]);
-      this._floorMeshes[idx] = null;
-    }
-
+    if (this._floorMeshes[idx]) { this.scene.remove(this._floorMeshes[idx]); this._floorMeshes[idx] = null; }
     if (!type) {
       if (plot.padMesh) plot.padMesh.visible = true;
       delete this._plotFloors[idx];
@@ -1373,31 +1207,20 @@ for (const c of this.clouds) {
       this.renderer.shadowMap.needsUpdate = true;
       return;
     }
-
     const floorObj = createFloor(type, color);
     if (!floorObj) return;
-
     floorObj.traverse(child => {
       if (child.isMesh && child.material) {
-        child.material.roughness = 1.0;
-        child.material.metalness = 0.0;
-        if (child.material.map) {
-          child.material.map.anisotropy = 1;
-          child.material.map.minFilter = THREE.LinearFilter;
-          child.material.map.generateMipmaps = false;
-          child.material.map.needsUpdate = true;
-        }
+        child.material.roughness = 1.0; child.material.metalness = 0.0;
+        if (child.material.map) { child.material.map.anisotropy = 1; child.material.map.minFilter = THREE.LinearFilter; child.material.map.generateMipmaps = false; child.material.map.needsUpdate = true; }
         child.material.needsUpdate = true;
       }
     });
-
-    floorObj.position.set(plot.cx, 0.05, plot.cz);
+    floorObj.position.set(plot.cx, 0.2, plot.cz);
     this.scene.add(floorObj);
     this._floorMeshes[idx] = floorObj;
     this._plotFloors[idx] = type;
-
     if (plot.padMesh) plot.padMesh.visible = false;
-
     if (save) {
       this.save.plotFloors = this.save.plotFloors ?? {};
       this.save.plotFloors[idx] = { type, color: color ?? null };
@@ -1424,14 +1247,9 @@ for (const c of this.clouds) {
     this.cancelPlacement(); this.cancelMove();
     this.selectedId = id; this.selectedColor = color; this.selectedStyle = style;
     if (!id) return;
-
-    if (this._isFloorType(id)) {
-      this.ghost = null; document.getElementById('placeBar').style.display = 'flex'; return;
-    }
-
+    if (this._isFloorType(id)) { this.ghost = null; document.getElementById('placeBar').style.display = 'flex'; return; }
     this.ghost = createFurniture(id, color, style, this.save.quality);
     if (!this.ghost) return;
-
     this.ghost.traverse(o => {
       if (o.isMesh && o.material && o.material.color) {
         o.material = o.material.clone();
@@ -1457,29 +1275,21 @@ for (const c of this.clouds) {
 
     if (!isWallOnly && !isCeilingFan) {
       const support = this._findSupportUnder(gx, gz);
-      if (support) {
-        return { x: support.rec.x, z: support.rec.z, rotY: support.rec.rotY, y: support.y, ok: true, msg: '📺 Apoyado sobre mueble' };
-      }
+      if (support) return { x: support.rec.x, z: support.rec.z, rotY: support.rec.rotY, y: support.y, ok: true, msg: '📺 Apoyado sobre mueble' };
     }
 
-    if (isCeilingFan) {
-      gy = this._wallMountHeight.techo_ventilador;
-      return { x: gx, z: gz, rotY: 0, y: gy, ok: true, msg: '🌀 Ventilador montado en el techo' };
-    }
+    if (isCeilingFan) { gy = this._wallMountHeight.techo_ventilador; return { x: gx, z: gz, rotY: 0, y: gy, ok: true, msg: '🌀 Ventilador montado en el techo' }; }
 
     let nearby = this._findNearbyWall(gx, gz, 2.5);
     if (!nearby) nearby = this._findNearbyPerimeterWall(gx, gz, 2.5);
 
     if (!nearby) {
-      if (isWallOnly) {
-        return { x: gx, z: gz, rotY, y: gy, ok: false, msg: id === 'alacena_aerea' ? '⚠️ La alacena necesita una pared' : '⚠️ Necesita una pared' };
-      }
+      if (isWallOnly) return { x: gx, z: gz, rotY, y: gy, ok: false, msg: id === 'alacena_aerea' ? '⚠️ La alacena necesita una pared' : '⚠️ Necesita una pared' };
       return null;
     }
 
     const wall = nearby.wall;
     let wallHorizontal; let wallEje;
-
     if (nearby.perimeter) { wallHorizontal = wall.horizontal; wallEje = wall.value; }
     else {
       const r = ((wall.rotY % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
@@ -1513,11 +1323,9 @@ for (const c of this.clouds) {
       else { nearFace = playerSide > 0 ? box.min.x : box.max.x; farFace = playerSide > 0 ? box.max.x : box.min.x; }
       const distNearToWall = (nearFace - wallEje) * playerSide;
       const depthOnAxis = (farFace - nearFace) * playerSide;
-
       let score = 0;
       if (distNearToWall < 0) score = -1000 + distNearToWall * 100;
       else score = depthOnAxis * 10 - Math.abs(distNearToWall - 0.05);
-
       if (score > bestScore) { bestScore = score; bestRotY = candidateRot; bestOffsetToWall = distNearToWall; }
     }
 
@@ -1532,7 +1340,6 @@ for (const c of this.clouds) {
 
   confirmPlace() {
     if (!this.selectedId) return false;
-
     if (this._isFloorType(this.selectedId)) {
       const idx = this.plotAt(this.camera.position.x, this.camera.position.z);
       if (idx < 0) { this._notifyTV('⚠️ Debes estar sobre un terreno'); return false; }
@@ -1544,13 +1351,84 @@ for (const c of this.clouds) {
     }
 
     if (!this.ghost) return false;
-    let gx = this.ghost.position.x; let gz = this.ghost.position.z;
-    let rotY = this.ghost.rotation.y; let gy = this.ghost.position.y ?? 0;
+    let gx = this.ghost.position.x; 
+    let gz = this.ghost.position.z;
+    let rotY = this.ghost.rotation.y; 
+    let gy = this.ghost.position.y ?? 0;
     const id = this.selectedId;
 
-    if (id.startsWith('techo_')) gy = this.playerFeetY + 3.0;
-
     const isBuild = id.startsWith('muro') || id.startsWith('techo');
+
+    if (isBuild) {
+      const groundY = this.terrain ? this.terrain.getHeightAt(gx, gz) : 0;
+      if (id.startsWith('techo_')) {
+        gy = groundY + 3.0;
+      } else if (id.startsWith('muro')) {
+        gy = groundY;
+      }
+
+      let bestDist = 5.0; 
+      let bestObj = null;
+
+      for (const p of this.placed) {
+        const isTargetValid = id.startsWith('techo_') 
+          ? (p.type.startsWith('muro') || p.type.startsWith('techo_'))
+          : p.type.startsWith('muro');
+
+        if (!isTargetValid) continue;
+        const dx = Math.abs(gx - p.x);
+        const dz = Math.abs(gz - p.z);
+        const dist = Math.hypot(dx, dz);
+
+        if (dist < bestDist) {
+          let score = dist;
+          if (id.startsWith('techo_') && p.type.startsWith('techo_')) score -= 2.0;
+          if (score < bestDist) { bestDist = score; bestObj = p; }
+        }
+      }
+
+      if (bestObj) {
+        const isNeighborTecho = bestObj.type.startsWith('techo_');
+        const rotNeighbor = ((bestObj.rotY % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+        const esHorizontal = Math.abs(Math.sin(rotNeighbor)) < 0.5;
+
+        if (id.startsWith('techo_')) {
+          const offset = isNeighborTecho ? 4.0 : 2.0;
+          if (esHorizontal) {
+            gx = bestObj.x;
+            const signZ = (Math.sin(this.manualRotY) > 0.1) ? 1 : -1;
+            gz = bestObj.z + (offset * signZ);
+            rotY = 0;
+          } else {
+            gz = bestObj.z;
+            const signX = (Math.cos(this.manualRotY) > 0.1) ? 1 : -1;
+            gx = bestObj.x + (offset * signX);
+            rotY = Math.PI / 2;
+          }
+          this.manualRotY = rotY;
+          gy = (this.terrain ? this.terrain.getHeightAt(gx, gz) : 0) + 3.0; 
+        } else {
+          const quieroHorizontal = Math.abs(Math.sin(this.manualRotY)) < 0.5;
+          if (esHorizontal && quieroHorizontal) {
+            gx = bestObj.x + (gx > bestObj.x ? 4.0 : -4.0);
+            gz = bestObj.z;
+            rotY = bestObj.rotY;
+          } else if (!esHorizontal && !quieroHorizontal) {
+            gx = bestObj.x;
+            gz = bestObj.z + (gz > bestObj.z ? 4.0 : -4.0);
+            rotY = bestObj.rotY;
+          } else {
+            gx = bestObj.x + (gx > bestObj.x ? 2.0 : -2.0);
+            gz = bestObj.z + (gz > bestObj.z ? 2.0 : -2.0);
+            rotY = this.manualRotY;
+          }
+          gy = (this.terrain ? this.terrain.getHeightAt(gx, gz) : 0);
+        }
+      } else {
+        rotY = this.manualRotY;
+      }
+    }
+
     const allowOutdoor = this._outdoorAllowed.has(id);
     const isStackable = this._stackable.includes(id);
     const mustBeInPlot = !isBuild && !allowOutdoor && !isStackable;
@@ -1569,7 +1447,7 @@ for (const c of this.clouds) {
       }
     }
 
-    if (!this._isValidPlacement(gx, gz)) return false;
+    if (!id.startsWith('techo_') && !this._isValidPlacement(gx, gz)) return false;
 
     const obj = createFurniture(id, this.selectedColor, this.selectedStyle, this.save.quality);
     place(obj, gx, gy, gz, rotY);
@@ -1582,7 +1460,6 @@ for (const c of this.clouds) {
 
     this.scene.add(obj);
 
-    // Parche Z-Fighting en muros nuevos
     if (id.startsWith('muro')) {
       obj.traverse(child => {
         if (child.isMesh && child.material) {
@@ -1605,9 +1482,7 @@ for (const c of this.clouds) {
     });
 
     this.renderer.shadowMap.needsUpdate = true;
-
     if (typeof this.onFurniturePlaced === 'function') this.onFurniturePlaced(id);
-
     return true;
   }
 
@@ -1625,7 +1500,7 @@ for (const c of this.clouds) {
     const isStackable = this._stackable.includes(id);
     const allowOutdoor = this._outdoorAllowed.has(id);
 
-    const LIMIT = this.HALF + (allowOutdoor ? 2.0 : -0.5);
+    const LIMIT = 190;
     if (Math.abs(x) > LIMIT || Math.abs(z) > LIMIT) return false;
 
     const mustBeInPlot = !isFloorType && !isBuild && !allowOutdoor && !isStackable;
@@ -1638,14 +1513,12 @@ for (const c of this.clouds) {
     if (isStackable) return true;
 
     const isGroundDecor = id === 'parche_pasto' || id === 'flores';
-
     const myY = this._wallMountHeight[id] ?? 0;
     const myHeightHalf = this._heightHalfFor(id);
 
     for (const p of this.placed) {
       const pIsBuild = p.type.startsWith('muro') || p.type.startsWith('techo');
       if (isBuild && pIsBuild) continue;
-
       const pIsGroundDecor = p.type === 'parche_pasto' || p.type === 'flores';
       if (isGroundDecor && pIsGroundDecor) continue;
 
@@ -1739,10 +1612,7 @@ for (const c of this.clouds) {
     const contentBtn = document.getElementById('editContent');
 
     if (hits.length === 0) {
-      if (this.editTarget) {
-        this.editTarget = null; this.highlightTarget(null); panel.style.display = 'none';
-        if (contentBtn) contentBtn.style.display = 'none';
-      }
+      if (this.editTarget) { this.editTarget = null; this.highlightTarget(null); panel.style.display = 'none'; if (contentBtn) contentBtn.style.display = 'none'; }
       return;
     }
 
@@ -1784,11 +1654,18 @@ for (const c of this.clouds) {
     if (!this.editTarget) return;
     this._moveRecord = this.editTarget;
     this._moveOriginalPos = { x: this.editTarget.x, z: this.editTarget.z };
+
     this.editTarget.obj.visible = false;
     const idx = this.placed.indexOf(this.editTarget);
     if (idx >= 0) this.placed.splice(idx, 1);
+
+    this.moveMode = false;
     this.startPlacement(this._moveRecord.type, this._moveRecord.color, this._moveRecord.style);
     this.moveMode = true;
+
+    this.manualRotY = this._moveRecord.rotY ?? 0;
+    if (this.ghost) this.ghost.rotation.y = this.manualRotY;
+
     document.getElementById('placeBar').style.display = 'none';
     document.getElementById('moveBar').style.display = 'flex';
     document.getElementById('editPanel').style.display = 'none';
@@ -1810,11 +1687,18 @@ for (const c of this.clouds) {
       gx = snapped.x; gz = snapped.z;
     }
 
+    if (!this._isValidPlacement(gx, gz)) {
+      this._restoreMovedFurniture();
+      document.getElementById('moveBar').style.display = 'none';
+      return false;
+    }
+
     const rec = this._moveRecord;
     rec.obj.visible = true;
     rec.x = gx; rec.y = gy; rec.z = gz; rec.rotY = rotY;
     rec.obj.position.set(gx, gy, gz); rec.obj.rotation.y = rotY;
-    this.placed.push(rec);
+    if (this.placed.indexOf(rec) === -1) this.placed.push(rec);
+
     const saved = this.save.placedFurniture ?? [];
     const old = this._moveOriginalPos;
     const j = saved.findIndex(s => s.type === rec.type && Math.abs(s.x - old.x) < 0.01 && Math.abs(s.z - old.z) < 0.01);
@@ -1829,8 +1713,7 @@ for (const c of this.clouds) {
 
   cancelMove() {
     if (!this.moveMode) return;
-    const rec = this._moveRecord;
-    if (rec) { rec.obj.visible = true; this.placed.push(rec); }
+    this._restoreMovedFurniture();
     this._moveRecord = null; this._moveOriginalPos = null; this.moveMode = false;
     this.cancelPlacement();
     document.getElementById('moveBar').style.display = 'none';
@@ -1838,6 +1721,18 @@ for (const c of this.clouds) {
 
   _prepareMoveOriginal() {
     if (this.editTarget) this._moveOriginalPos = { x: this.editTarget.x, z: this.editTarget.z };
+  }
+
+  _restoreMovedFurniture() {
+    const rec = this._moveRecord;
+    if (!rec || !rec.obj) return;
+    if (this.placed.indexOf(rec) !== -1) return;
+    rec.obj.visible = true;
+    rec.x = this._moveOriginalPos?.x ?? rec.x;
+    rec.z = this._moveOriginalPos?.z ?? rec.z;
+    rec.obj.position.set(rec.x, rec.y, rec.z);
+    this.placed.push(rec);
+    this.renderer.shadowMap.needsUpdate = true;
   }
 
   _findNearbyWall(x, z, maxDist = 2.5) {
@@ -1866,10 +1761,7 @@ for (const c of this.clouds) {
       let dist;
       if (w.axis === 'z') dist = Math.abs(z - w.value);
       else dist = Math.abs(x - w.value);
-      if (dist < bestDist) {
-        bestDist = dist;
-        closest = { wall: { ...w, type: 'muro_perimeter' }, horizontal: w.horizontal, dist, perimeter: true };
-      }
+      if (dist < bestDist) { bestDist = dist; closest = { wall: { ...w, type: 'muro_perimeter' }, horizontal: w.horizontal, dist, perimeter: true }; }
     }
     return closest;
   }
@@ -1877,10 +1769,7 @@ for (const c of this.clouds) {
   _initPlacementTap() {
     const raycaster = new THREE.Raycaster(); const mouse = new THREE.Vector2();
     let downX = 0, downY = 0;
-    this.canvas.addEventListener('touchstart', (e) => {
-      const t = e.changedTouches[0]; downX = t.clientX; downY = t.clientY;
-    }, { passive: true });
-
+    this.canvas.addEventListener('touchstart', (e) => { const t = e.changedTouches[0]; downX = t.clientX; downY = t.clientY; }, { passive: true });
     this.canvas.addEventListener('touchend', (e) => {
       const t = e.changedTouches[0];
       if (Math.hypot(t.clientX - downX, t.clientY - downY) > 12) return;
@@ -1987,24 +1876,16 @@ for (const c of this.clouds) {
       audio.src = finalUrl; audio.loop = true; audio.autoplay = true; audio.volume = 0;
       audio.style.display = 'none'; document.body.appendChild(audio);
       this.tvAudio = audio; audio.play().catch(() => {});
-      audio.addEventListener('loadedmetadata', () => {
-        if (rec.tvTime && rec.tvTime > 0) { try { audio.currentTime = rec.tvTime; } catch (e) {} }
-      });
+      audio.addEventListener('loadedmetadata', () => { if (rec.tvTime && rec.tvTime > 0) { try { audio.currentTime = rec.tvTime; } catch (e) {} } });
       this._startAudioVisualization(rec);
     } else if (type === 'youtube' || type === 'vimeo' || type === 'gdrive') {
       let embedUrl = null;
       if (type === 'youtube') embedUrl = this._youtubeEmbed(finalUrl);
       else if (type === 'gdrive') embedUrl = finalUrl;
-      else if (type === 'vimeo') {
-        const m = finalUrl.match(/vimeo\.com\/(\d+)/);
-        if (m) embedUrl = `https://player.vimeo.com/video/${m[1]}?autoplay=1`;
-      }
+      else if (type === 'vimeo') { const m = finalUrl.match(/vimeo\.com\/(\d+)/); if (m) embedUrl = `https://player.vimeo.com/video/${m[1]}?autoplay=1`; }
       if (embedUrl) {
         const overlay = document.getElementById('tvOverlay'); const inner = document.getElementById('tvOverlayInner');
-        if (overlay && inner) {
-          inner.innerHTML = `<iframe src="${embedUrl}" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
-          overlay.style.display = 'flex';
-        }
+        if (overlay && inner) { inner.innerHTML = `<iframe src="${embedUrl}" allow="autoplay; encrypted-media" allowfullscreen></iframe>`; overlay.style.display = 'flex'; }
       }
     } else {
       this._loadImageAsBase64(finalUrl, rec);
@@ -2034,17 +1915,11 @@ for (const c of this.clouds) {
             this._notifyTV('✅ Imagen cargada');
             const input = document.getElementById('tvUrl');
             if (input && this.tvTarget === rec) input.value = base64;
-          }, undefined, (err) => {
-            console.error('Error al procesar la imagen', err);
-            this._notifyTV('⚠️ No se pudo procesar la imagen');
-          });
+          }, undefined, (err) => { console.error('Error al procesar la imagen', err); this._notifyTV('⚠️ No se pudo procesar la imagen'); });
         };
         reader.readAsDataURL(blob);
       })
-      .catch((err) => {
-        console.warn('Error al descargar imagen:', err);
-        this._notifyTV('⚠️ No se pudo descargar. Intenta otra URL.');
-      });
+      .catch((err) => { console.warn('Error al descargar imagen:', err); this._notifyTV('⚠️ No se pudo descargar. Intenta otra URL.'); });
   }
 
   _loadVideoContent(rec, url, type) {
@@ -2065,21 +1940,13 @@ for (const c of this.clouds) {
     if (type === 'hls') {
       if (video.canPlayType('application/vnd.apple.mpegurl')) {
         video.src = url;
-        video.addEventListener('loadedmetadata', () => {
-          attachTexture();
-          if (rec.tvTime && rec.tvTime > 0) { try { video.currentTime = rec.tvTime; } catch (e) {} }
-          video.play().catch(() => {});
-        });
+        video.addEventListener('loadedmetadata', () => { attachTexture(); if (rec.tvTime && rec.tvTime > 0) { try { video.currentTime = rec.tvTime; } catch (e) {} } video.play().catch(() => {}); });
         video.addEventListener('error', () => { this._notifyTV('⚠️ Error al cargar el stream HLS'); });
       } else if (typeof Hls !== 'undefined' && Hls.isSupported()) {
         const hls = new Hls({ enableWorker: true, lowLatencyMode: true });
         this.tvHls = hls;
         hls.loadSource(url); hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          attachTexture();
-          if (rec.tvTime && rec.tvTime > 0) { try { video.currentTime = rec.tvTime; } catch (e) {} }
-          video.play().catch(() => {});
-        });
+        hls.on(Hls.Events.MANIFEST_PARSED, () => { attachTexture(); if (rec.tvTime && rec.tvTime > 0) { try { video.currentTime = rec.tvTime; } catch (e) {} } video.play().catch(() => {}); });
         hls.on(Hls.Events.ERROR, (event, data) => {
           if (data.fatal) {
             switch (data.type) {
@@ -2089,49 +1956,29 @@ for (const c of this.clouds) {
             }
           }
         });
-      } else {
-        this._notifyTV('⚠️ HLS no soportado en este navegador');
-      }
+      } else { this._notifyTV('⚠️ HLS no soportado en este navegador'); }
     } else {
       video.src = url;
-      video.addEventListener('loadeddata', () => {
-        attachTexture();
-        if (rec.tvTime && rec.tvTime > 0) { try { video.currentTime = rec.tvTime; } catch (e) {} }
-        video.play().catch(() => {});
-      });
+      video.addEventListener('loadeddata', () => { attachTexture(); if (rec.tvTime && rec.tvTime > 0) { try { video.currentTime = rec.tvTime; } catch (e) {} } video.play().catch(() => {}); });
       video.addEventListener('error', () => { this._notifyTV('⚠️ Error al cargar el video'); });
     }
   }
 
   stopTVContent(rec) {
     if (this.tvHls) { try { this.tvHls.destroy(); } catch (e) {} this.tvHls = null; }
-    if (this.tvVideo) {
-      this.tvVideo.pause(); this.tvVideo.src = ''; this.tvVideo.load && this.tvVideo.load();
-      this.tvVideo.remove(); this.tvVideo = null;
-    }
-    if (this.tvAudio) {
-      this.tvAudio.pause(); this.tvAudio.src = ''; this.tvAudio.remove(); this.tvAudio = null;
-    }
+    if (this.tvVideo) { this.tvVideo.pause(); this.tvVideo.src = ''; this.tvVideo.load && this.tvVideo.load(); this.tvVideo.remove(); this.tvVideo = null; }
+    if (this.tvAudio) { this.tvAudio.pause(); this.tvAudio.src = ''; this.tvAudio.remove(); this.tvAudio = null; }
     if (this._audioVizRAF) { cancelAnimationFrame(this._audioVizRAF); this._audioVizRAF = null; }
     const overlay = document.getElementById('tvOverlay');
-    if (overlay) {
-      overlay.style.display = 'none';
-      const inner = document.getElementById('tvOverlayInner');
-      if (inner) inner.innerHTML = '';
-    }
-    if (rec && rec.obj && rec.obj.userData.screen) {
-      rec.obj.userData.screen.material = new THREE.MeshBasicMaterial({ color: 0xeeeeee });
-      rec.obj.userData.screenMat = rec.obj.userData.screen.material;
-    }
+    if (overlay) { overlay.style.display = 'none'; const inner = document.getElementById('tvOverlayInner'); if (inner) inner.innerHTML = ''; }
+    if (rec && rec.obj && rec.obj.userData.screen) { rec.obj.userData.screen.material = new THREE.MeshBasicMaterial({ color: 0xeeeeee }); rec.obj.userData.screenMat = rec.obj.userData.screen.material; }
   }
 
   _startAudioVisualization(rec) {
     const screen = rec.obj.userData.screen;
-    const canvas = document.createElement('canvas');
-    canvas.width = 512; canvas.height = 288;
+    const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 288;
     const ctx = canvas.getContext('2d');
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.colorSpace = THREE.SRGBColorSpace;
+    const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace;
     screen.material = new THREE.MeshBasicMaterial({ map: tex });
     rec.obj.userData.screenMat = screen.material;
 
@@ -2161,9 +2008,7 @@ for (const c of this.clouds) {
     if (sources.length === 0) return;
     let tvPos = null;
     if (this.tvTarget && this.tvTarget.obj) tvPos = this.tvTarget.obj.position;
-    else {
-      for (const p of this.placed) { if (p.type === 'tv' && p.tvUrl) { tvPos = p.obj.position; break; } }
-    }
+    else { for (const p of this.placed) { if (p.type === 'tv' && p.tvUrl) { tvPos = p.obj.position; break; } } }
     if (!tvPos) { for (const src of sources) src.volume = 0; return; }
     const dx = this.camera.position.x - tvPos.x; const dz = this.camera.position.z - tvPos.z;
     const dist = Math.hypot(dx, dz);
@@ -2233,10 +2078,7 @@ for (const c of this.clouds) {
     rec.tvUrl = url;
     const saved = this.save.placedFurniture ?? [];
     const i = saved.findIndex(s => s.type === rec.type && Math.abs(s.x - rec.x) < 0.01 && Math.abs(s.z - rec.z) < 0.01);
-    if (i >= 0) {
-      saved[i].tvUrl = url;
-      saved[i].tvTime = 0;
-    }
+    if (i >= 0) { saved[i].tvUrl = url; saved[i].tvTime = 0; }
     if (typeof this.onTVSave === 'function') this.onTVSave();
   }
 
@@ -2293,79 +2135,159 @@ for (const c of this.clouds) {
     return best;
   }
 
-  _updatePlayerPhysics(dt) {
-    if (this.isSeated || this.isSleeping) { this.playerVelY = 0; return; }
-    const moveVec = this.controls.getMoveVector();
-    const speed = 4.0; const moving = moveVec.lengthSq() > 0.0001;
-    this.camera.position.addScaledVector(moveVec, speed * dt);
-    this._clampToWorld(this.camera.position);
-    const rampaY = this._rampaYAt(this.camera.position.x, this.camera.position.z, this.playerFeetY);
-    if (rampaY !== null) {
-      const k = Math.min(1, 12 * dt);
-      this.playerFeetY += (rampaY - this.playerFeetY) * k;
-      if (Math.abs(this.playerFeetY - rampaY) < 0.01) this.playerFeetY = rampaY;
-      this.playerVelY = 0; this.camera.position.y = this.playerFeetY + this.PLAYER_HEIGHT;
-    } else {
-      const wantJump = this.controls.consumeJump();
-      if (wantJump && Math.abs(this.playerVelY) < 0.01) this.playerVelY = this.JUMP_VELOCITY;
-      this.playerVelY += this.GRAVITY * dt; this.playerFeetY += this.playerVelY * dt;
-      const surfaceY = this._surfaceYAt(this.camera.position.x, this.camera.position.z, this.playerFeetY);
-      if (this.playerFeetY <= surfaceY) {
-        const diff = surfaceY - this.playerFeetY;
-        if (diff > 0.5 && Math.abs(this.playerVelY) > 0.5) { this.playerFeetY = surfaceY; this.playerVelY = 0; }
-        else {
-          const k = Math.min(1, this._stepLerpSpeed * dt);
-          this.playerFeetY += diff * k;
-          if (Math.abs(this.playerFeetY - surfaceY) < 0.01) { this.playerFeetY = surfaceY; this.playerVelY = 0; }
-        }
-      }
-      this.camera.position.y = this.playerFeetY + this.PLAYER_HEIGHT;
-    }
+  setRunning(on) { this.isRunning = on; }
 
-    if (this.playerAvatar) {
-      this.playerAvatar.position.x = this.camera.position.x;
-      this.playerAvatar.position.z = this.camera.position.z;
-      this.playerAvatar.position.y = this.playerFeetY;
-      if (moving) {
-        const targetHeading = Math.atan2(moveVec.x, moveVec.z);
-        let diff = targetHeading - this._avatarHeading;
-        while (diff > Math.PI) diff -= Math.PI * 2;
-        while (diff < -Math.PI) diff += Math.PI * 2;
-        this._avatarHeading += diff * Math.min(1, 12 * dt);
-        this.playerAvatar.rotation.y = this._avatarHeading;
-      }
-      const brazoIzq = this.playerAvatar.userData.brazoIzq;
-      const brazoDer = this.playerAvatar.userData.brazoDer;
-      const piernaIzq = this.playerAvatar.userData.piernaIzq;
-      const piernaDer = this.playerAvatar.userData.piernaDer;
-      if (moving) {
-        this._walkPhase += dt * 8; const swing = Math.sin(this._walkPhase) * 0.7;
-        if (brazoIzq) brazoIzq.rotation.x =  swing;
-        if (brazoDer) brazoDer.rotation.x = -swing;
-        if (piernaIzq) piernaIzq.rotation.x = -swing;
-        if (piernaDer) piernaDer.rotation.x =  swing;
-      } else {
-        const k = Math.min(1, 10 * dt);
-        if (brazoIzq)  brazoIzq.rotation.x  += (0 - brazoIzq.rotation.x)  * k;
-        if (brazoDer)  brazoDer.rotation.x  += (0 - brazoDer.rotation.x)  * k;
-        if (piernaIzq) piernaIzq.rotation.x += (0 - piernaIzq.rotation.x) * k;
-        if (piernaDer) piernaDer.rotation.x += (0 - piernaDer.rotation.x) * k;
-      }
+  updatePlayerGroundHeight() {
+    if (!this.terrain) return;
+    const groundY = this.terrain.getHeightAt(this.camera.position.x, this.camera.position.z);
+    if (groundY > this.playerFeetY) this.playerFeetY = groundY;
+    else this.playerFeetY += (groundY - this.playerFeetY) * 0.15;
+  }
+
+  _updatePlayerPhysics(dt) {
+  if (this.isSeated || this.isSleeping) { this.playerVelY = 0; return; }
+
+  const moveVec = this.controls.getMoveVector();
+  const moving = moveVec.lengthSq() > 0.0001;
+  const currentSpeed = this.isRunning && moving ? 7.5 : 4.0;
+
+  this.camera.position.addScaledVector(moveVec, currentSpeed * dt);
+  this._clampToWorld(this.camera.position);
+
+  const raycaster = new THREE.Raycaster();
+  const origin = new THREE.Vector3(this.camera.position.x, this.playerFeetY + 10, this.camera.position.z);
+  raycaster.set(origin, new THREE.Vector3(0, -1, 0));
+
+  const floorObjects = [this.grass];
+  for (let i = 0; i < 4; i++) {
+    if (this._floorMeshes[i]) floorObjects.push(this._floorMeshes[i]);
+  }
+  for (const p of this.placed) {
+    if (p.type.startsWith('techo_')) continue; 
+    if (this._walkables[p.type] || p.type.startsWith('escalera')) {
+      floorObjects.push(p.obj);
     }
   }
 
+  const hits = raycaster.intersectObjects(floorObjects, true);
+  let targetFloorY = 0;
+
+  if (hits.length > 0) {
+    targetFloorY = hits[0].point.y;
+  } else {
+    targetFloorY = this.terrain ? this.terrain.getHeightAt(this.camera.position.x, this.camera.position.z) : 0;
+  }
+
+  const rampaY = this._rampaYAt(this.camera.position.x, this.camera.position.z, this.playerFeetY);
+  if (rampaY !== null) targetFloorY = Math.max(targetFloorY, rampaY);
+
+  // 🔥 SALTO
+  const wantJump = this.controls.consumeJump();
+  if (wantJump && Math.abs(this.playerFeetY - targetFloorY) < 0.2) {
+    this.playerVelY = this.JUMP_VELOCITY;
+  }
+
+  // 🔥 FÍSICA VERTICAL
+  this.playerVelY += this.GRAVITY * dt; 
+  this.playerFeetY += this.playerVelY * dt;
+
+  // 🔥 DETECCIÓN DE ATERRIZAJE (anti-jitter y caída suave)
+  const isOnGround = this.playerFeetY <= targetFloorY;
+  
+  if (isOnGround) {
+    // Aterrizaje: el jugador toca el suelo
+    if (this.playerVelY < 0) {
+      // Guardar la velocidad de impacto para efecto visual
+      this._landImpact = Math.min(1, Math.abs(this.playerVelY) / 20);
+    }
+    this.playerFeetY = targetFloorY;
+    this.playerVelY = 0;
+  }
+
+  // 🔥 EFECTO VISUAL DE ATERRIZAJE (la cámara baja un poco y sube)
+  if (!this._landImpact) this._landImpact = 0;
+  this._landImpact *= 0.85; // Se desvanece lentamente
+  if (this._landImpact < 0.01) this._landImpact = 0;
+
+  // Aplicar head bobbing
+  let bobOffset = 0;
+  if (moving) {
+    this._bobTimer += dt * (this.isRunning ? 15 : 10);
+    const bobAmount = this.isRunning ? 0.08 : 0.04;
+    bobOffset = Math.sin(this._bobTimer) * bobAmount;
+  } else {
+    this._bobTimer = 0;
+  }
+
+  // 🔥 Posición final de la cámara
+  // La cámara baja por el impacto (solo visual)
+  const impactOffset = -this._landImpact * 0.15; 
+  this.camera.position.y = this.playerFeetY + this.PLAYER_HEIGHT + bobOffset + impactOffset;
+
+  // Resto del código (avatar, guardado, animaciones)
+  if (this.playerAvatar) {
+    this.playerAvatar.position.x = this.camera.position.x;
+    this.playerAvatar.position.z = this.camera.position.z;
+    this.playerAvatar.position.y = this.playerFeetY;
+
+    if (moving) {
+      const targetHeading = Math.atan2(moveVec.x, moveVec.z);
+      let diff = targetHeading - this._avatarHeading;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      this._avatarHeading += diff * Math.min(1, 12 * dt);
+      this.playerAvatar.rotation.y = this._avatarHeading;
+    }
+
+    const dx = this.camera.position.x - this._lastSavedPos.x;
+    const dz = this.camera.position.z - this._lastSavedPos.z;
+    if (Math.sqrt(dx * dx + dz * dz) > 5) {
+      this._lastSavedPos = { x: this.camera.position.x, z: this.camera.position.z };
+      this.save.position = { x: this.camera.position.x, y: this.camera.position.y, z: this.camera.position.z };
+      if (window.Storage) window.Storage.save(this.save);
+    }
+
+    const brazoIzq = this.playerAvatar.userData.brazoIzq;
+    const brazoDer = this.playerAvatar.userData.brazoDer;
+    const piernaIzq = this.playerAvatar.userData.piernaIzq;
+    const piernaDer = this.playerAvatar.userData.piernaDer;
+
+    if (moving) {
+      const animSpeed = this.isRunning ? 14 : 8;
+      this._walkPhase += dt * animSpeed;
+      const swing = Math.sin(this._walkPhase) * (this.isRunning ? 1.0 : 0.7);
+      if (brazoIzq) brazoIzq.rotation.x = swing;
+      if (brazoDer) brazoDer.rotation.x = -swing;
+      if (piernaIzq) piernaIzq.rotation.x = -swing;
+      if (piernaDer) piernaDer.rotation.x = swing;
+    } else {
+      const k = Math.min(1, 10 * dt);
+      if (brazoIzq)  brazoIzq.rotation.x  += (0 - brazoIzq.rotation.x)  * k;
+      if (brazoDer)  brazoDer.rotation.x  += (0 - brazoDer.rotation.x)  * k;
+      if (piernaIzq) piernaIzq.rotation.x += (0 - piernaIzq.rotation.x) * k;
+      if (piernaDer) piernaDer.rotation.x += (0 - piernaDer.rotation.x) * k;
+    }
+  }
+}
+
   _clampToWorld(pos) {
-    const m = 1.0;
-    pos.x = Math.max(-this.HALF + m, Math.min(this.HALF - m, pos.x));
-    pos.z = Math.max(-this.HALF + m, Math.min(this.HALF - m, pos.z));
-    const playerR = 0.35; const DOOR_W = 1.2; const DOOR_HALF = DOOR_W / 2; const DOOR_PASS_HALF = DOOR_HALF - 0.05;
+    const WORLD_LIMIT = 190;
+    pos.x = Math.max(-WORLD_LIMIT, Math.min(WORLD_LIMIT, pos.x));
+    pos.z = Math.max(-WORLD_LIMIT, Math.min(WORLD_LIMIT, pos.z));
+
+    const playerR = 0.35;
+    const DOOR_W = 1.2;
+    const DOOR_HALF = DOOR_W / 2;
+    const DOOR_PASS_HALF = DOOR_HALF - 0.05;
 
     for (const p of this.placed) {
       if (!p.type.startsWith('muro')) continue;
       const rot = ((p.rotY % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
       const horizontal = Math.abs(Math.sin(rot)) < 0.5;
-      const halfX = horizontal ? 2.0 : 0.1; const halfZ = horizontal ? 0.1 : 2.0;
-      const dx = Math.abs(pos.x - p.x); const dz = Math.abs(pos.z - p.z);
+      const halfX = horizontal ? 2.0 : 0.1;
+      const halfZ = horizontal ? 0.1 : 2.0;
+      const dx = Math.abs(pos.x - p.x);
+      const dz = Math.abs(pos.z - p.z);
       const isDoor = p.type === 'muro_puerta' || p.type === 'muro_puerta_prem';
       const isOpen = isDoor && p.obj?.userData?.puertaAbierta === true;
 
@@ -2390,11 +2312,30 @@ for (const c of this.clouds) {
       if (p.type.startsWith('muro') || p.type.startsWith('techo')) continue;
       if (p.type === 'alfombra' || p.type === 'parche_pasto' || p.type === 'flores') continue;
       if (p.type.startsWith('escalera')) continue;
-      const dx = pos.x - p.x; const dz = pos.z - p.z; const d = Math.hypot(dx, dz);
+      const dx = pos.x - p.x;
+      const dz = pos.z - p.z;
+      const d = Math.hypot(dx, dz);
       const minD = p.radius + 0.25;
       if (d < minD) {
         const ang = Math.atan2(dz, dx);
-        pos.x = p.x + Math.cos(ang) * minD; pos.z = p.z + Math.sin(ang) * minD;
+        pos.x = p.x + Math.cos(ang) * minD;
+        pos.z = p.z + Math.sin(ang) * minD;
+      }
+    }
+
+    if (this.terrain && this.terrain.colliders) {
+      const playerRadius = 0.35;
+      for (const col of this.terrain.colliders) {
+        const dx = pos.x - col.x;
+        const dz = pos.z - col.z;
+        const dist = Math.hypot(dx, dz);
+        const minDist = playerRadius + col.radius;
+
+        if (dist < minDist) {
+          const ang = Math.atan2(dz, dx);
+          pos.x = col.x + Math.cos(ang) * minDist;
+          pos.z = col.z + Math.sin(ang) * minDist;
+        }
       }
     }
   }
@@ -2419,35 +2360,26 @@ for (const c of this.clouds) {
 
   _animateGrass() {
     if (this.save.quality !== 'alta') return;
-
     const dummy = new THREE.Object3D();
-
     for (const p of this.placed) {
       if (p.type !== 'parche_pasto') continue;
-
       const grassMesh = p.obj.userData.grassMesh;
       const baseMatrices = grassMesh?.userData?.baseMatrix;
       if (!grassMesh || !baseMatrices) continue;
-
       for (let i = 0; i < grassMesh.count; i++) {
         const baseMatrix = baseMatrices[i];
         if (!baseMatrix) continue;
-
         const basePos = new THREE.Vector3().setFromMatrixPosition(baseMatrix);
-
         const phase = basePos.x * 1.1 + basePos.z * 1.1;
         const t = this.windTime + phase;
-
         const windX = Math.sin(t) * this.windAmplitude;
         const windZ = Math.cos(t * 0.7) * this.windAmplitude * 0.5;
-
         dummy.position.copy(basePos);
         dummy.rotation.set(windX, 0, windZ);
         dummy.scale.set(1, 1, 1);
         dummy.updateMatrix();
         grassMesh.setMatrixAt(i, dummy.matrix);
       }
-
       grassMesh.instanceMatrix.needsUpdate = true;
     }
   }
@@ -2455,12 +2387,23 @@ for (const c of this.clouds) {
   start(onTick) {
     const step = () => {
       const dt = Math.min(this.clock.getDelta(), 0.1);
-      
       this.windTime += dt * this.windSpeed;
 
       this._updateDayCycle(dt);
       this._updateWeather(dt);
       this._updateClouds(dt);
+
+      if (this.save.quality === 'alta' || this.save.quality === 'ultra') {
+        if (this.terrain && this.terrain.waterMeshes) {
+          for (const w of this.terrain.waterMeshes) {
+            if (w.mesh && w.mesh.material.map) {
+              w.mesh.material.map.offset.x += 0.02 * dt;
+              w.mesh.material.map.offset.y += 0.01 * dt;
+            }
+          }
+        }
+      }
+      
       this._updateTVAudioVolume();
       this._updateDoors(dt);
       this._animateGrass();
@@ -2468,24 +2411,115 @@ for (const c of this.clouds) {
       this._tvSaveTimer += dt;
       if (this._tvSaveTimer >= 2) { this._tvSaveTimer = 0; this._saveTVCursor(); }
       this._updatePlayerPhysics(dt);
+
+      if (this.terrain) {  
+  // 🔥 OPTIMIZACIÓN ANTI-TIRONES: 
+  // Solo actualizamos colisiones si nos movimos al menos 4 metros
+  const distSinceLastCol = Math.hypot(
+    this.camera.position.x - (this._lastColPos?.x ?? 0),
+    this.camera.position.z - (this._lastColPos?.z ?? 0)
+  );
+  
+  if (!this._lastColPos || distSinceLastCol > 4.0) { // Cada 4 metros
+    this.terrain.updateColliders(this.camera.position);
+    this._lastColPos = { x: this.camera.position.x, z: this.camera.position.z };
+  }
+}
+
+      if (this.companion) this.companion.update(this.camera.position);
+
       this._updateInteractBtn();
 
       for (const p of this.placed) {
-        if (p.type === 'techo_ventilador' && p.obj.userData.ventilador) {
-          p.obj.userData.ventilador.rotation.y += dt * 5;
-        }
+        if (p.type === 'techo_ventilador' && p.obj.userData.ventilador) p.obj.userData.ventilador.rotation.y += dt * 5;
       }
 
       if (this.ghost) {
         const f = new THREE.Vector3(-Math.sin(this.controls.yaw), 0, -Math.cos(this.controls.yaw));
         const target = this.camera.position.clone().addScaledVector(f, 3);
-        let gx = Math.round(target.x * 2) / 2; let gz = Math.round(target.z * 2) / 2;
-        let rotY = this.manualRotY; let gy = this.playerFeetY;
+        
+        let gx = Math.round(target.x * 10) / 10; 
+        let gz = Math.round(target.z * 10) / 10;
+        
+        let rotY = this.manualRotY; 
+        let gy = this.playerFeetY;
         const id = this.selectedId;
-
-        if (id && id.startsWith('techo_')) gy = this.playerFeetY + 3.0;
-
         const isBuild = id && (id.startsWith('muro') || id.startsWith('techo'));
+
+        if (isBuild) {
+          const groundY = this.terrain ? this.terrain.getHeightAt(gx, gz) : 0;
+          gy = id.startsWith('techo_') ? groundY + 3.0 : groundY;
+
+          let bestDist = 5.0; 
+          let bestObj = null;
+
+          for (const p of this.placed) {
+            const isTargetValid = id.startsWith('techo_') 
+              ? (p.type.startsWith('muro') || p.type.startsWith('techo_'))
+              : p.type.startsWith('muro');
+
+            if (!isTargetValid) continue;
+            
+            const dx = Math.abs(target.x - p.x);
+            const dz = Math.abs(target.z - p.z);
+            const dist = Math.hypot(dx, dz);
+
+            if (dist < bestDist) {
+              let score = dist;
+              if (id.startsWith('techo_') && p.type.startsWith('techo_')) score -= 2.0;
+
+              if (score < bestDist) {
+                bestDist = score;
+                bestObj = p;
+              }
+            }
+          }
+
+          if (bestObj) {
+            const isNeighborTecho = bestObj.type.startsWith('techo_');
+            const rotNeighbor = ((bestObj.rotY % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+            const esHorizontal = Math.abs(Math.sin(rotNeighbor)) < 0.5;
+            
+            if (id.startsWith('techo_')) {
+              const offset = isNeighborTecho ? 4.0 : 2.0;
+              
+              if (esHorizontal) {
+                gx = bestObj.x;
+                const signZ = (Math.sin(this.manualRotY) > 0.1) ? 1 : -1;
+                gz = bestObj.z + (offset * signZ);
+                rotY = 0; 
+              } else {
+                gz = bestObj.z;
+                const signX = (Math.cos(this.manualRotY) > 0.1) ? 1 : -1;
+                gx = bestObj.x + (offset * signX);
+                rotY = Math.PI / 2; 
+              }
+              this.manualRotY = rotY;
+              gy = (this.terrain ? this.terrain.getHeightAt(gx, gz) : 0) + 3.0; 
+            } 
+            else {
+              const quieroHorizontal = Math.abs(Math.sin(this.manualRotY)) < 0.5;
+              
+              if (esHorizontal && quieroHorizontal) {
+                gx = bestObj.x + (target.x > bestObj.x ? 4.0 : -4.0);
+                gz = bestObj.z;
+                this.manualRotY = bestObj.rotY;
+              } else if (!esHorizontal && !quieroHorizontal) {
+                gx = bestObj.x;
+                gz = bestObj.z + (target.z > bestObj.z ? 4.0 : -4.0);
+                this.manualRotY = bestObj.rotY;
+              } else {
+                gx = bestObj.x + (target.x > bestObj.x ? 2.0 : -2.0);
+                gz = bestObj.z + (target.z > bestObj.z ? 2.0 : -2.0);
+              }
+              rotY = this.manualRotY;
+              
+              const newGroundY = this.terrain ? this.terrain.getHeightAt(gx, gz) : 0;
+              gy = newGroundY;
+            }
+          }
+        }
+
         const allowOutdoor = this._outdoorAllowed.has(id);
         const isStackable = this._stackable.includes(id);
         const mustBeInPlot = !isBuild && !allowOutdoor && !isStackable;
@@ -2503,9 +2537,14 @@ for (const c of this.clouds) {
           else if (res && !res.ok) gy = this.playerFeetY;
         }
 
-        this.ghost.position.x = gx; this.ghost.position.y = gy; this.ghost.position.z = gz;
+        this.ghost.position.x = gx; 
+        this.ghost.position.y = gy; 
+        this.ghost.position.z = gz;
         this.ghost.rotation.y = rotY;
-        const ok = this._isValidPlacement(gx, gz);
+        
+        let ok = this._isValidPlacement(gx, gz);
+        if (id.startsWith('techo_')) ok = true;
+        
         this.ghost.traverse(o => { if (o.isMesh && o.material && o.material.color) o.material.color.set(ok ? 0x66ff88 : 0xff5566); });
       }
 
@@ -2530,6 +2569,162 @@ for (const c of this.clouds) {
     };
     step();
   }
+
+  _generateWildVegetation() {
+  console.log("🌱 Generando nueva vegetación salvaje con lagos...");
+  this.save.worldScatter = [];
+
+  const getRealGroundY = (px, pz) => this.terrain.getHeightAt(px, pz);
+
+  // 🔥 LEER DENSIDAD DE FOLLAJE
+  const density = this.save.foliageDensity || 'alta';
+  let densityMult = 1.0;
+  if (density === 'baja') densityMult = 0.3;
+  else if (density === 'media') densityMult = 0.6;
+  else if (density === 'alta') densityMult = 1.0;
+  else if (density === 'extrema') densityMult = 2.5;
+
+  const q = this.save.quality || 'media';
+  let grassAmount = 3000;
+  if (q === 'ultra') grassAmount = 8000;
+  else if (q === 'alta') grassAmount = 5000;
+  else if (q === 'baja') grassAmount = 1000;
+  grassAmount = Math.floor(grassAmount * densityMult);
+
+  const categories = [
+    { prefix: 'arbol', count: 6, amount: Math.floor(800 * densityMult), scaleRange: [0.8, 1.3] },
+    { prefix: 'pino', count: 3, amount: Math.floor(400 * densityMult), scaleRange: [0.9, 1.4] },
+    { prefix: 'muerto', count: 3, amount: Math.floor(100 * densityMult), scaleRange: [0.8, 1.2] },
+    { prefix: 'arbusto', count: 4, amount: Math.floor(600 * densityMult), scaleRange: [0.6, 1.0] },
+    { prefix: 'pasto', count: 11, amount: grassAmount, scaleRange: [0.5, 1.2] },
+    { prefix: 'flor', count: 4, amount: Math.floor(1000 * densityMult), scaleRange: [0.6, 1.0] },
+    { prefix: 'piedra_p', count: 1, amount: Math.floor(800 * densityMult), scaleRange: [0.2, 0.4] },
+    { prefix: 'piedra_m', count: 1, amount: Math.floor(400 * densityMult), scaleRange: [0.5, 0.7] },
+    { prefix: 'piedra_g', count: 1, amount: Math.floor(100 * densityMult), scaleRange: [0.8, 1.2] }
+  ];
+
+  const WORLD_LIMIT = 380;
+
+  for (const lake of this.terrain.lakes) {
+    this.terrain._createLakeAt(lake);
+    const lakeVegAmount = Math.floor(300 * densityMult);
+    for (let j = 0; j < lakeVegAmount; j++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = lake.radius + 2 + Math.random() * 25;
+      const x = lake.x + Math.cos(angle) * dist;
+      const z = lake.z + Math.sin(angle) * dist;
+      const y = getRealGroundY(x, z);
+
+      const rand = Math.random();
+      let id, scale;
+      if (rand < 0.4) { id = `flor${String(Math.floor(Math.random() * 4) + 1).padStart(2, '0')}`; scale = 0.6 + Math.random() * 0.4; }
+      else if (rand < 0.7) { id = `arbusto${String(Math.floor(Math.random() * 4) + 1).padStart(2, '0')}`; scale = 0.6 + Math.random() * 0.4; }
+      else if (rand < 0.9) { id = `pasto${String(Math.floor(Math.random() * 11) + 1).padStart(2, '0')}`; scale = 0.5 + Math.random() * 0.5; }
+      else { id = `arbol${String(Math.floor(Math.random() * 6) + 1).padStart(2, '0')}`; scale = 0.8 + Math.random() * 0.5; }
+
+      const rotY = Math.random() * Math.PI * 2;
+      this.save.worldScatter.push({ id, x, y, z, rotY, scale });
+    }
+  }
+
+  categories.forEach(cat => {
+    for (let i = 0; i < cat.amount; i++) {
+      const variacion = Math.floor(Math.random() * cat.count) + 1;
+      const id = `${cat.prefix}${String(variacion).padStart(2, '0')}`;
+
+      let x, z, y, validPos = false, attempts = 0;
+      while (!validPos && attempts < 20) {
+        x = (Math.random() - 0.5) * WORLD_LIMIT * 2;
+        z = (Math.random() - 0.5) * WORLD_LIMIT * 2;
+        if (Math.sqrt(x * x + z * z) < 35) { attempts++; continue; }
+
+        if (this.terrain.lakes) {
+          let inLake = false;
+          for (const lake of this.terrain.lakes) {
+            if (Math.sqrt((x - lake.x) ** 2 + (z - lake.z) ** 2) < lake.radius) { inLake = true; break; }
+          }
+          if (inLake) { attempts++; continue; }
+        }
+
+        validPos = true;
+        for (const item of this.save.worldScatter) {
+          const minDist = cat.prefix === 'pasto' ? 0.5 : (cat.prefix === 'flor' ? 0.8 : 1.5);
+          if (Math.sqrt((item.x - x) ** 2 + (item.z - z) ** 2) < minDist) { validPos = false; break; }
+        }
+        attempts++;
+      }
+
+      if (!validPos) continue;
+      y = getRealGroundY(x, z);
+
+      let scale;
+      if (cat.prefix === 'arbol' || cat.prefix === 'pino') scale = 0.8 + Math.random() * 1.7;
+      else if (cat.prefix === 'piedra_g') scale = 0.8 + Math.random() * 0.5;
+      else scale = cat.scaleRange[0] + Math.random() * (cat.scaleRange[1] - cat.scaleRange[0]);
+
+      const rotY = Math.random() * Math.PI * 2;
+      this.save.worldScatter.push({ id, x, y, z, rotY, scale });
+    }
+  });
+
+  Storage.save(this.save);
+  this.terrain.allScatterItems = this.save.worldScatter.map(item => ({ ...item, _loaded: false }));
+
+  setTimeout(() => {
+    if (this.terrain) this.terrain.loadAllChunks();
+  }, 200);
+}
+
+  _loadWildVegetation() {
+  console.log(`🌱 Cargando vegetación guardada (${this.save.worldScatter.length} objetos)...`);
+
+  if (!this.terrain || !this.terrain.scatterMeshes) {
+    setTimeout(() => this._loadWildVegetation(), 500);
+    return;
+  }
+
+  this.terrain.allScatterItems = this.save.worldScatter.map(item => ({ ...item, _loaded: false }));
+
+  console.log(`✅ ${this.terrain.allScatterItems.length} objetos en cola.`);
+
+  setTimeout(() => {
+    if (this.terrain) this.terrain.loadAllChunks();
+  }, 200);
+}
+
+  _regenerateFoliage() {
+  if (!this.terrain) return;
+  console.log("🔄 Regenerando vegetación...");
+  
+  // 1. Destruir los InstancedMesh viejos
+  if (this.terrain.scatterMeshes) {
+    for (const id in this.terrain.scatterMeshes) {
+      const mesh = this.terrain.scatterMeshes[id];
+      this.scene.remove(mesh);
+      mesh.geometry.dispose();
+      mesh.material.dispose();
+    }
+  }
+  
+  // 2. Reiniciar estado
+  this.terrain.scatterMeshes = {};
+  this.terrain.allColliders = [];
+  this.terrain.colliders = [];
+  this.save.worldScatter = [];
+  
+  // 3. Volver a generar
+  this.terrain._scatterVegetation().then(() => {
+    this._generateWildVegetation(); // Este llama a loadAllChunks
+    
+    if (window.buildStaticMapLayer) window.buildStaticMapLayer(); 
+    
+    if (this._notifyTV) {
+      this._notifyTV(`🌿 Densidad: ${(this.save.foliageDensity || 'alta').toUpperCase()}`);
+    }
+  }).catch(err => {
+    console.error("Error regenerando vegetación:", err);
+  });
+}
 
   getState() {
     return {

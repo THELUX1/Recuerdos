@@ -1,4 +1,6 @@
 // shop.js
+import { Storage } from './storage.js';
+
 export const SHOP_ITEMS = [
   // --- Camas ---
   { id: 'cama_basica',   name: 'Cama básica',    emoji: '🛏️', price: 0,   free: true,  category: 'cama', premium: false },
@@ -46,13 +48,14 @@ export const SHOP_ITEMS = [
   { id: 'luz_aplique',          name: 'Reflector LED',       emoji: '🔦', price: 45,  free: false, category: 'luz', premium: false },
 
   // --- Plantas ---
-  // --- Plantas ---
-{ id: 'planta_maceta', name: 'Maceta',          emoji: '🪴', price: 15,  free: false, category: 'planta', premium: false },
-{ id: 'arbusto',       name: 'Arbusto',         emoji: '🌿', price: 25,  free: false, category: 'planta', premium: false },
-{ id: 'arbol_chico',   name: 'Árbol chico',     emoji: '🌳', price: 60,  free: false, category: 'planta', premium: false },
-{ id: 'arbol_grande',  name: 'Árbol grande',    emoji: '🌲', price: 120, free: false, category: 'planta', premium: false },
-{ id: 'parche_pasto',  name: 'Parche de pasto', emoji: '🌿', price: 10,  free: false, category: 'planta', premium: false },
-{ id: 'flores',        name: 'Flores',          emoji: '🌸', price: 8,   free: false, category: 'planta', premium: false },
+  { id: 'planta_maceta', name: 'Maceta',          emoji: '🪴', price: 15,  free: false, category: 'planta', premium: false },
+  { id: 'arbusto',       name: 'Arbusto',         emoji: '🌿', price: 25,  free: false, category: 'planta', premium: false },
+  { id: 'arbol_chico',   name: 'Pino',            emoji: '🌲', price: 60,  free: false, category: 'planta', premium: false },
+  { id: 'arbol_grande',  name: 'Árbol Frondoso',  emoji: '🌳', price: 120, free: false, category: 'planta', premium: false },
+  { id: 'arbol_muerto',  name: 'Árbol Muerto',    emoji: '🪵', price: 50,  free: false, category: 'planta', premium: false }, // NUEVO
+  { id: 'tronco',        name: 'Tronco',          emoji: '🪵', price: 10,  free: false, category: 'planta', premium: false }, // NUEVO
+  { id: 'parche_pasto',  name: 'Parche de pasto', emoji: '🌾', price: 10,  free: false, category: 'planta', premium: false },
+  { id: 'flores',        name: 'Flores',          emoji: '🌸', price: 8,   free: false, category: 'planta', premium: false },
 
   // --- Otros ---
   { id: 'lampara',       name: 'Lámpara de pie', emoji: '💡', price: 30,  free: false, category: 'otro', premium: false },
@@ -77,6 +80,19 @@ export const SHOP_ITEMS = [
 
   // --- TECHOS ---
   { id: 'techo_basico',  name: 'Techo',          emoji: '🏠', price: 30,  free: false, category: 'techo', premium: true },
+
+  // --- MASCOTAS ---
+  { id: 'mascota_corgi', name: 'Corgi', price: 500, category: 'mascota', emoji: '🐶', isCompanion: true },
+  { id: 'mascota_panda', name: 'Panda rojo', price: 600, category: 'mascota', emoji: '🐼', isCompanion: true },
+  { id: 'mascota_zorro', name: 'Zorro', price: 600, category: 'mascota', emoji: '🦊', isCompanion: true },
+  { id: 'mascota_pato', name: 'Pato', price: 300, category: 'mascota', emoji: '🦆', isCompanion: true },
+  { id: 'mascota_hipopotamo', name: 'Hipopótamo', price: 800, category: 'mascota', emoji: '🦛', isCompanion: true },
+  { id: 'mascota_rinoceronte', name: 'Rinoceronte', price: 900, category: 'mascota', emoji: '🦏', isCompanion: true },
+  { id: 'mascota_tiburon', name: 'Tiburón', price: 700, category: 'mascota', emoji: '🦈', isCompanion: true },
+  { id: 'mascota_murcielago', name: 'Murciélago', price: 400, category: 'mascota', emoji: '🦇', isCompanion: true },
+  { id: 'mascota_ornitorrinco', name: 'Ornitorrinco', price: 550, category: 'mascota', emoji: '🦫', isCompanion: true },
+  { id: 'mascota_medusa', name: 'Medusa', price: 450, category: 'mascota', emoji: '🪼', isCompanion: true },
+  { id: 'mascota_pez', name: 'Pez linterna', price: 350, category: 'mascota', emoji: '🐟', isCompanion: true },
 
   // --- ELECTRODOMÉSTICOS ---
   { id: 'tv',   name: 'TV',    emoji: '📺', price: 80, free: false, category: 'electro', premium: false },
@@ -110,6 +126,12 @@ export const WINDOW_STYLES = [
   { id: 'moderna',   label: '▭ Moderna'    },
   { id: 'mirador',   label: '🏛 Mirador'   },
   { id: 'circular',  label: '⭕ Circular'  },
+];
+
+// Selectores de estilo para las plantas
+export const PLANT_STYLES = [
+  { id: '01', label: '1' }, { id: '02', label: '2' }, { id: '03', label: '3' },
+  { id: '04', label: '4' }, { id: '05', label: '5' }, { id: '06', label: '6' },
 ];
 
 export class Shop {
@@ -153,7 +175,7 @@ export class Shop {
     document.querySelectorAll('.closeBtn').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = btn.dataset.close;
-        document.getElementById(id).style.display = 'none';
+        if(document.getElementById(id)) document.getElementById(id).style.display = 'none';
       });
     });
 
@@ -238,6 +260,31 @@ export class Shop {
 
       el.addEventListener('click', () => {
         if (item.free || this.save.coins >= item.price) {
+          
+          // === LÓGICA DE MASCOTAS ===
+          if (item.isCompanion) {
+            if (!this.save.ownedCompanions) this.save.ownedCompanions = [];
+            if (this.save.ownedCompanions.includes(item.id)) {
+              this.save.activeCompanion = item.id;
+              Storage.save(this.save);
+              if (window.world && typeof window.world.setCompanion === 'function') window.world.setCompanion(item.id);
+              this._toast(`🐾 ${item.name} equipado`);
+              this.closeShop();
+              return;
+            }
+            this.save.coins -= item.price;
+            this.updateCoins();
+            this.save.ownedCompanions.push(item.id);
+            this.save.activeCompanion = item.id;
+            Storage.save(this.save);
+            if (window.world && typeof window.world.setCompanion === 'function') window.world.setCompanion(item.id);
+            this.renderCatalog();
+            this._toast(`🐾 ${item.name} comprado y equipado`);
+            this.closeShop();
+            return; 
+          }
+
+          // === LÓGICA NORMAL ===
           this.save.coins -= item.price;
           this.addToInventory(item.id, 1);
           this.updateCoins();
@@ -300,6 +347,7 @@ export class Shop {
       el.addEventListener('click', () => {
         this.selectedId = id;
 
+        // Color
         if (item.premium) {
           this.selectedColor = this.selectedColor ?? WALL_PALETTE[0];
           this.colorPick.style.display = 'block';
@@ -309,10 +357,9 @@ export class Shop {
           this.colorPick.style.display = 'none';
         }
 
-        if (item.hasStyle) {
-          this.selectedStyle = this.selectedStyle ?? (
-            id.includes('puerta') ? DOOR_STYLES[0].id : WINDOW_STYLES[0].id
-          );
+        // Estilo (para puertas, ventanas y PLANTAS)
+        if (item.hasStyle || item.category === 'planta') {
+          this.selectedStyle = this.selectedStyle ?? '01'; // Default style 01
           this.stylePick.style.display = 'block';
           this._renderStyles(id);
         } else {
@@ -320,7 +367,7 @@ export class Shop {
           this.stylePick.style.display = 'none';
         }
 
-        const anyCustom = item.premium || item.hasStyle;
+        const anyCustom = item.premium || item.hasStyle || item.category === 'planta';
         this.customizeBar.style.display = anyCustom ? 'flex' : 'none';
 
         if (this.onSelect) {
@@ -328,7 +375,6 @@ export class Shop {
         }
 
         this.closeInventory();
-
         this._toast(`Colocando ${item.name}`);
       });
 
@@ -363,7 +409,12 @@ export class Shop {
 
   _renderStyles(itemId) {
     this.styleSw.innerHTML = '';
-    const styles = itemId.includes('puerta') ? DOOR_STYLES : WINDOW_STYLES;
+    let styles = [];
+    if (itemId.includes('puerta')) styles = DOOR_STYLES;
+    else if (itemId.includes('ventana')) styles = WINDOW_STYLES;
+    else if (itemId.includes('arbol') || itemId.includes('arbusto')) styles = PLANT_STYLES;
+    else styles = PLANT_STYLES; // Fallback
+
     for (const s of styles) {
       const el = document.createElement('div');
       el.className = 'style-chip';

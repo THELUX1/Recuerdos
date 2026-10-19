@@ -9,12 +9,20 @@ export const Storage = {
       rotation: { yaw: 0, pitch: 0 },
       room: 'calle',
       quality: 'media',
+      foliageDensity: 'alta',
+      renderDistance: 'media',
       sensitivity: 4,
-      musicOn: false,
+      musicOn: true,
+      musicVolume: 30, // 🔥 NUEVO: Volumen de música (0-100)
       coins: 100,
       inventory: ['cama', 'mesa', 'silla'],
       placedFurniture: [],
       weather: 'despejado',
+      
+      // === MASCOTAS ===
+      activeCompanion: null,
+      ownedCompanions: [],
+
       missions: [
         { id: 'm_camas',    title: 'Coloca 3 camas',       reward: 150, done: false, progress: 0, target: 3,  match: 'cama',    type: 'count' },
         { id: 'm_muros',    title: 'Construye 2 paredes',  reward: 120, done: false, progress: 0, target: 2,  match: 'muro',    type: 'count' },
@@ -27,6 +35,19 @@ export const Storage = {
         { id: 'm_piso',     title: 'Cambia 1 piso',        reward: 60,  done: false, progress: 0, target: 1,  match: 'piso',    type: 'count' },
       ],
       lastSave: Date.now(),
+
+      // === RECOMPENSA DIARIA ===
+      lastDailyReward: 0,
+      dailyStreak: 0,
+
+      // === LOGROS ===
+      achievements: [],
+      lifetimeStats: {
+        furniturePlaced: 0,
+        coinsEarned: 0,
+        missionsCompleted: 0,
+        weatherChanges: 0,
+      },
     };
   },
 
@@ -37,8 +58,7 @@ export const Storage = {
       const data = JSON.parse(raw);
       const def = this.default();
       const merged = { ...def, ...data };
-      
-      // Reparar misiones si faltan campos o si es un save viejo
+
       if (!Array.isArray(merged.missions) || merged.missions.length === 0) {
         merged.missions = def.missions;
       } else {
@@ -49,6 +69,30 @@ export const Storage = {
           done: m.done ?? false
         }));
       }
+
+      merged.lastDailyReward = merged.lastDailyReward ?? 0;
+      merged.dailyStreak = merged.dailyStreak ?? 0;
+      merged.achievements = Array.isArray(merged.achievements) ? merged.achievements : [];
+      merged.lifetimeStats = {
+        furniturePlaced: 0,
+        coinsEarned: 0,
+        missionsCompleted: 0,
+        weatherChanges: 0,
+        ...(merged.lifetimeStats || {}),
+      };
+      
+      merged.activeCompanion = merged.activeCompanion ?? null;
+      merged.ownedCompanions = Array.isArray(merged.ownedCompanions) ? merged.ownedCompanions : [];
+
+      merged.foliageDensity = merged.foliageDensity ?? 'alta';
+      merged.renderDistance = merged.renderDistance ?? 'media';
+      merged.musicVolume = merged.musicVolume ?? 30; // 🔥 Fallback para partidas viejas
+
+      if (!merged._audioMigratedV1) {
+        merged.musicOn = true;
+        merged._audioMigratedV1 = true;
+      }
+
       return merged;
     } catch {
       return this.default();
